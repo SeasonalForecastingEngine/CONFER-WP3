@@ -1,6 +1,9 @@
-# Python template project
+# CONFER-WP3
+This repository contains **Python code** developed within several sub-projects of work package 3 of the [CONFER](https://confer-h2020.eu/) project, one of the European Union’s Horizon 2020 research and innovation programmes. An **R-package for forecast evaluation** was also developed in this work package, and can be found [here](https://github.com/SeasonalForecastingEngine/SeaVal).
 
-This repository is meant to be a starting point for project work in Python. We have [another repository](https://github.com/NorskRegnesentral/python_project_standard/tree/main), that serves more as an introduction to project work in Python and contains a lot of useful information. If you are wondering about something Python-related, you could try to check that out.
+
+
+is meant to be a starting point for project work in Python. We have [another repository](https://github.com/NorskRegnesentral/python_project_standard/tree/main), that serves more as an introduction to project work in Python and contains a lot of useful information. If you are wondering about something Python-related, you could try to check that out.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->

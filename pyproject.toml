@@ -9,16 +9,16 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry]
 # Information about the project and authors should be filled in the fields below.
 # If some of the fields are not relevant to your project, they can be removed.
-name = "package_name"            # The name of your package
-version = "0.1.0"                # The version of your package
-description = ""                 # A short description of your package
-authors = ["NR Person"]          # A list of authors in the format Name <email> (The email is optional).
+name = "confer_wp3"
+version = "0.1.0"
+description = "Python code related to seasonal forecasting over GHA, developed in WP3 of the CONFER project"
+authors = ["Michael Scheuerer"]
 license = "Proprietary."         # The license of your package.
-readme = "README.md"             # Path to your README file (likely this can be kept as is)
+readme = "README.md"
 # Below, we specify to poetry which package should be included. As it is now, we are telling poetry to include the package called "package_name".
 # This should be changed to the name of your package. The name of the package should be the same as the name of the folder "/src/<package_name>".
 packages = [
-    { include = "package_name", from = "src" }
+    { include = "confer_wp3", from = "src" }
 ]
 
 [tool.poetry.dependencies]
@@ -26,8 +26,13 @@ packages = [
 # The fields below can be left blank and poetry will update them for you when a package is added or removed
 # using "poetry add <package>"/"poetry remove <package>".
 python = ">=3.10,<3.12" # Required Python versions
-# examples of dependencies:
-numpy = "^1.26.4"
+numpy = "^1.24.2"
+scipy = "^1.10.1"
+xarray = "^2023.1.0"
+matplotlib = "^3.7.1"
+Cartopy = "^0.21.1"
+# pickle ?!?
+
 
 [tool.poetry.group.dev.dependencies]
 # Packages needed in development, but not in the package.
@@ -39,14 +44,13 @@ ruff = "^0.2.0"     # Linting and formatting library (recommended)
 ipython = "^8.21.0"
 ipykernel = "^6.29.2"
 jupyter = "^1.0.0"
-matplotlib = "^3.8.3"   # Library for plotting and visualization
 
 [tool.poetry.group.tutorial.dependencies]
 # Dependencies that only are needed in a tutorial associated with a project.
 # E.g. if you have some examples in the project folder where you show how the package can be used.
 # Typically such examples can be found in a "notebooks/"-folder in the project folder (a level up from the "src"-folder)
 # A package can be added as tutorial dependency by "poetry add <package> --group tutorial"
-pandas = "^2.2.0"
+pandas = "^2.0.0"
 
 [tool.pytest.ini_options]
 # (Recommended.) Configure 'pytest'. If the pytest-library is used for testing, specifications can be given here.
