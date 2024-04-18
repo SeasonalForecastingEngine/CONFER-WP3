@@ -1,0 +1,9 @@
+{
+    // Avoid VSCode starting the '.venv' environment automatically when opening a terminal.
+    // We've seen some issues with this, such as the virtual environment not being
+    // activated correctly. Instead, enter the environment manually by running:
+    // - `poetry shell` if using poetry, or:
+    // - `source .venv/bin/activate` on Linux.
+    // - `.venv/Scripts/active.ps1` on Windows.
+    "python.terminal.activateEnvironment": false,
+}

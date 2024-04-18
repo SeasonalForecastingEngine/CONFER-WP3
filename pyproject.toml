@@ -1,0 +1,73 @@
+# This file is a configuration file used in Python projects to specify which packages the project depends on.
+# If a package is added by "poetry add <package>", poetry will unsure that this file is updated with the new dependency and its version.
+
+[build-system]
+# Configuration for how to build the project package using poetry (likely this does not have to be changed)
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+# Information about the project and authors should be filled in the fields below.
+# If some of the fields are not relevant to your project, they can be removed.
+name = "package_name"            # The name of your package
+version = "0.1.0"                # The version of your package
+description = ""                 # A short description of your package
+authors = ["NR Person"]          # A list of authors in the format Name <email> (The email is optional).
+license = "Proprietary."         # The license of your package.
+readme = "README.md"             # Path to your README file (likely this can be kept as is)
+# Below, we specify to poetry which package should be included. As it is now, we are telling poetry to include the package called "package_name".
+# This should be changed to the name of your package. The name of the package should be the same as the name of the folder "/src/<package_name>".
+packages = [
+    { include = "package_name", from = "src" }
+]
+
+[tool.poetry.dependencies]
+# Below this header, the Python version of the project and the dependencies of the package are listed.
+# The fields below can be left blank and poetry will update them for you when a package is added or removed
+# using "poetry add <package>"/"poetry remove <package>".
+python = ">=3.10,<3.12" # Required Python versions
+# examples of dependencies:
+numpy = "^1.26.4"
+
+[tool.poetry.group.dev.dependencies]
+# Packages needed in development, but not in the package.
+# Typically, this would be testing frameworks (e.g. pytest) and linters (e.g. ruff).
+# A package can be added as a group dependency by "poetry add <package> --group dev"
+pytest = ">=7.1.3"  # Library for testing (recommended)
+ruff = "^0.2.0"     # Linting and formatting library (recommended)
+# Libraries for running jupyter notebooks:
+ipython = "^8.21.0"
+ipykernel = "^6.29.2"
+jupyter = "^1.0.0"
+matplotlib = "^3.8.3"   # Library for plotting and visualization
+
+[tool.poetry.group.tutorial.dependencies]
+# Dependencies that only are needed in a tutorial associated with a project.
+# E.g. if you have some examples in the project folder where you show how the package can be used.
+# Typically such examples can be found in a "notebooks/"-folder in the project folder (a level up from the "src"-folder)
+# A package can be added as tutorial dependency by "poetry add <package> --group tutorial"
+pandas = "^2.2.0"
+
+[tool.pytest.ini_options]
+# (Recommended.) Configure 'pytest'. If the pytest-library is used for testing, specifications can be given here.
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+    # Any other folders with tests in them:
+    # "integration",
+]
+
+[tool.ruff]
+# (Recommended.) ruff is a Python linter and code formatter. This is an optional field and can be removed.
+# Otherwise, the field can be used to give instructions to ruff.
+line-length = 120
+indent-width = 4
+target-version = "py310" # Specify to ruff what the minimum Python version to target is (here, Python 3.10)
+
+[tool.ruff.format]
+# (Recommended.) Specify formatting options to ruff
+quote-style = "double"              # Specify to ruff that double quotation marks should be used
+indent-style = "space"              # Indent with spaces, rather than tabs.
+skip-magic-trailing-comma = true    # Do not respect magic trailing commas.
+line-ending = "auto"                # Automatically detect the appropriate line ending.

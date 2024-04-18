@@ -1,0 +1,10 @@
+# This file gives instruction to poetry. You may alter it if you have any
+# particular demands, otherwise it can be left unchanged.
+
+# Keep cache for a project in the project directory
+cache-dir = ".poetry/cache"
+
+[virtualenvs]
+# Useful in Jupyter to avoid recreating environment.
+# Keep virtual environment in project directory.
+in-project = true
