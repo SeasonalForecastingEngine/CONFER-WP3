@@ -2,12 +2,37 @@
 import numpy as np
 import xarray as xr
 
-from scipy.interpolate import RectBivariateSpline
-from scipy.interpolate import interp1d
+from os import path
+from functools import partial
+from datetime import datetime, timedelta
 
-from glp import domain_boundaries, climatological_reference_period, global_parameters
+from scipy.interpolate import RectBivariateSpline, interp1d
+
+from glp import domain_boundaries, global_parameters
 
 
+# Preprocessing function for loading data: renames coordinates, if necessary, and subsets to selected region
+
+def _preprocess(x, lon_bnds, lat_bnds):
+    coord_names = list(x.coords._names)
+    coord_dict = {}
+    for cstr in ['lat','lon','time']:
+        idx_matched = [i for i in range(len(coord_names)) if coord_names[i].find(cstr)>=0]
+        if len(idx_matched) != 1:
+            raise Exception("Unable to identify '{cstr}' coordinate")
+        if coord_names[idx_matched[0]] != cstr:
+            coord_dict[coord_names[idx_matched[0]]] = cstr
+        if list(x.keys())[0] != 'precip':
+            coord_dict[list(x.keys())[0]] = 'precip'
+    x = x.rename(coord_dict)
+    if x.lat.values[0] < x.lat.values[-1]:
+        return x.sel(lon=slice(*lon_bnds), lat=slice(*lat_bnds))
+    else:
+        return x.isel(lat=slice(None,None,-1)).sel(lon=slice(*lon_bnds), lat=slice(*lat_bnds))
+
+
+
+# Helper function to bilinearly interpolate ensemble forecasts
 
 def interpolate_forecasts(prcp_fcst, lat_fcst, lon_fcst, lat_trgt, lon_trgt):
     nmbs, nlatf, nlonf = prcp_fcst.shape
@@ -20,6 +45,9 @@ def interpolate_forecasts(prcp_fcst, lat_fcst, lon_fcst, lat_trgt, lon_trgt):
     return prcp_fcst_itp
 
 
+
+# Helper function that identifies the rainy season onset day for given threshold exceedances and length of critical dry period
+
 def find_onset_day(exc1d, exc3d, len_dry_spell):
     n = len(exc1d)
     wet_spell = np.logical_and(exc3d[:(n-2)], exc1d[:(n-2)])
@@ -31,23 +59,47 @@ def find_onset_day(exc1d, exc3d, len_dry_spell):
     return onset_day
 
 
-def calculate_onset_hist(region, month_start, thr_dry, thr_wet, len_dry_spell, data_dir):
-    lon_bounds, lat_bounds = domain_boundaries(region)
-    year_clm_start, year_clm_end = climatological_reference_period()
+
+# Function that calculates historical onset dates from CHIRPS data
+
+def calculate_onset_hist(region, month_start, year_clm_start, year_clm_end, thr_dry, thr_wet, len_dry_spell, chirps_dir):
+    lon_bnds, lat_bnds = domain_boundaries(region)
     day_start, nwks, ndts, ntwd = global_parameters()
     # Load CHIRPS data
-    filename_chirps = f'{data_dir}CHIRPS_daily_{year_clm_start}-{year_clm_end}_{month_start}.nc'
-    data_load = xr.open_dataset(filename_chirps, engine='netcdf4')
-    data_subset = data_load.sel(lat=slice(lat_bounds[0],lat_bounds[1]), lon=slice(lon_bounds[0],lon_bounds[1]))
-    prcp_daily = data_subset.prcp.values
-    data_load.close()
-    nyrs, nlt, nlat, nlon = prcp_daily.shape    
-    prcp_1d = prcp_daily[:,(day_start-1):(day_start+ndts-1),:,:]
-    prcp_3d = prcp_daily[:,(day_start-1):(day_start+ndts-1),:,:] + prcp_daily[:,day_start:(day_start+ndts),:,:] + prcp_daily[:,(day_start+1):(day_start+ndts+1),:,:]
+    year_data_end = (datetime(year_clm_end,month_start,day_start)+timedelta(days=ndts+1)).year
+    requested_years = [*range(year_clm_start, year_data_end+1)]
+    available_years = [year for year in requested_years if path.exists(f'{chirps_dir}/chirps-v2.0.{year}.days_p25.nc')]
+    years_clm = list(set([*range(year_clm_start, year_clm_end+1)]).intersection(available_years))
+    nyrs = len(years_clm)
+    if len(available_years) < len(requested_years):
+        missing_years = ' '.join(map(str, list(set(requested_years).difference(set(available_years)))))
+        warnings.warn(f"The following years of CHIRPS data could not be loaded:"+"\n"+missing_years)
+    file_list = [f'{chirps_dir}/chirps-v2.0.{year}.days_p25.nc' for year in available_years]
+    partial_func = partial(_preprocess, lon_bnds=lon_bnds, lat_bnds=lat_bnds)
+    print("Loading data ...")
+    ds = xr.open_mfdataset(file_list, concat_dim='time', preprocess=partial_func, combine='nested', combine_attrs='drop_conflicts')
+    nlon = ds.lon.size
+    nlat = ds.lat.size
+    prcp_1d =  np.full((nyrs,ndts,nlat,nlon), np.nan, dtype=float)
+    prcp_3d =  np.full((nyrs,ndts,nlat,nlon), np.nan, dtype=float)
+    for iyr in range(nyrs):
+        date_start = datetime(years_clm[iyr],month_start,day_start)
+        date_end_1d = date_start + timedelta(days=ndts-1)
+        date_end_3d = date_start + timedelta(days=ndts+1)
+        prcp_1d[iyr,:,:,:] = ds.sel(time=slice(date_start,date_end_1d)).precip.values
+        prcp_3d[iyr,:,:,:] = ds.sel(time=slice(date_start,date_end_3d)).rolling(time=3).sum().precip.values[2:,:,:]
+    ds.close()
+    if not isinstance(thr_dry, np.ndarray):
+        thr_dry = np.full((nlat,nlon), thr_dry, dtype=float)
+    if not isinstance(thr_wet, np.ndarray):
+        thr_wet = np.full((nlat,nlon), thr_wet, dtype=float)
+    if not isinstance(len_dry_spell, np.ndarray):
+        len_dry_spell = np.full((nlat,nlon), len_dry_spell, dtype=int)
     exc_1d = np.greater(prcp_1d, thr_dry[None,None,:,:])
     exc_3d = np.greater(prcp_3d, thr_wet[None,None,:,:])
     onset_day = np.full((nyrs,nlat,nlon), np.nan, dtype=float)
     for iyr in range(nyrs):
+        print(f"Calculating rainy season onset dates for {years_clm[iyr]} ...")
         for ilat in range(nlat):
             for ilon in range(nlon):
                 if len_dry_spell[ilat,ilon] < 2 or len_dry_spell[ilat,ilon] > 20:
@@ -57,6 +109,9 @@ def calculate_onset_hist(region, month_start, thr_dry, thr_wet, len_dry_spell, d
                     onset_day[iyr,ilat,ilon] = find_onset_day(exc_1d[iyr,:,ilat,ilon], exc_3d[iyr,:,ilat,ilon], len_dry_spell[ilat,ilon])
     return onset_day
 
+
+
+# Helper function that calculates the relative frequency of days with precipitation amounts below a given threshold
 
 def calculate_prob_below_threshold(prcp_acc, thresh):
     day_start, nwks, ndts, ntwd = global_parameters()
@@ -69,6 +124,9 @@ def calculate_prob_below_threshold(prcp_acc, thresh):
         prob_below_thr[idt,:,:][mask] = np.nan
     return prob_below_thr
 
+
+
+# Function that bilinearly interpolates the forecasts and uses their CDF for adjusting (quantile mapping) the original thresholds
 
 def interpolate_and_map_threshold(prcp_fcst, prob_below_thr, lat_fcst, lon_fcst, lat_trgt, lon_trgt):
     nyrs, nmbs, nlt, nlatf, nlonf = prcp_fcst.shape
@@ -101,52 +159,96 @@ def interpolate_and_map_threshold(prcp_fcst, prob_below_thr, lat_fcst, lon_fcst,
     return thresh_adj
 
 
-def calculate_adjusted_thresholds(region, month_start, system, thr_dry, thr_wet, data_dir):
-    lon_bounds, lat_bounds = domain_boundaries(region)
-    year_clm_start, year_clm_end = climatological_reference_period()
+
+# Main function for threshold adjustment: loads CHIRPS and forecast data, calculates climatological exceedance probabilities, and calls the helper function above
+
+def calculate_adjusted_thresholds(region, month_start, year_clm_start, year_clm_end, system, thr_dry, thr_wet, chirps_dir, fcst_dir):
+    lon_bnds, lat_bnds = domain_boundaries(region)
+    day_start, nwks, ndts, ntwd = global_parameters()
    # Load CHIRPS data and calculate 1-day/3-day precipitation amounts and their climatological probabilities not exceeding the chosen threshold values
-    filename_chirps = f'{data_dir}CHIRPS_daily_{year_clm_start}-{year_clm_end}_{month_start}.nc'
-    data_load = xr.open_dataset(filename_chirps, engine='netcdf4')
-    data_subset = data_load.sel(lat=slice(lat_bounds[0],lat_bounds[1]), lon=slice(lon_bounds[0],lon_bounds[1]))
-    lon_chirps = data_subset.lon.values
-    lat_chirps = data_subset.lat.values
-    prcp_daily = data_subset.prcp.values
-    data_load.close()
-    prcp_1d = prcp_daily[:,:-2,:,:]
-    prcp_3d = prcp_daily[:,:-2,:,:] + prcp_daily[:,1:-1,:,:] + prcp_daily[:,2:,:,:]
+    year_data_end = (datetime(year_clm_end,month_start,day_start)+timedelta(days=ndts+1)).year
+    requested_years = [*range(year_clm_start, year_data_end+1)]
+    available_years = [year for year in requested_years if path.exists(f'{chirps_dir}/chirps-v2.0.{year}.days_p25.nc')]
+    years_clm = list(set([*range(year_clm_start, year_clm_end+1)]).intersection(available_years))
+    nyrs = len(years_clm)
+    if len(available_years) < len(requested_years):
+        missing_years = ' '.join(map(str, list(set(requested_years).difference(set(available_years)))))
+        warnings.warn(f"The following years of CHIRPS data could not be loaded:"+"\n"+missing_years)
+    file_list = [f'{chirps_dir}/chirps-v2.0.{year}.days_p25.nc' for year in available_years]
+    partial_func = partial(_preprocess, lon_bnds=lon_bnds, lat_bnds=lat_bnds)
+    print("Loading CHIRPS data ...")
+    ds = xr.open_mfdataset(file_list, concat_dim='time', preprocess=partial_func, combine='nested', combine_attrs='drop_conflicts')
+    lon_chirps = ds.lon.values
+    lat_chirps = ds.lat.values
+    nlon = ds.lon.size
+    nlat = ds.lat.size
+    prcp_1d =  np.full((nyrs,ndts+ntwd+1,nlat,nlon), np.nan, dtype=float)
+    prcp_3d =  np.full((nyrs,ndts+ntwd+1,nlat,nlon), np.nan, dtype=float)
+    for iyr in range(nyrs):
+        date_start = datetime(years_clm[iyr],month_start,1)
+        date_end_1d = date_start + timedelta(days=ndts+ntwd)
+        date_end_3d = date_start + timedelta(days=ndts+ntwd+2)
+        prcp_1d[iyr,:,:,:] = ds.sel(time=slice(date_start,date_end_1d)).precip.values
+        prcp_3d[iyr,:,:,:] = ds.sel(time=slice(date_start,date_end_3d)).rolling(time=3).sum().precip.values[2:,:,:]
+    ds.close()
+    if not isinstance(thr_dry, np.ndarray):
+        thr_dry = np.full((nlat,nlon), thr_dry, dtype=float)
+    if not isinstance(thr_wet, np.ndarray):
+        thr_wet = np.full((nlat,nlon), thr_wet, dtype=float)
     prcp_1d_pb_thr_dry = calculate_prob_below_threshold(prcp_1d, thr_dry)
     prcp_3d_pb_thr_wet = calculate_prob_below_threshold(prcp_3d, thr_wet)
    # Load hindcast data and calculate 1-day/3-day precipitation amounts
-    filename_ensfcst = f'{data_dir}{system.upper()}_daily_{year_clm_start}-{year_clm_end}_{month_start}.nc'
-    data_load = xr.open_dataset(filename_ensfcst, engine='netcdf4')
-    data_subset = data_load.sel(lat=slice(lat_bounds[0],lat_bounds[1]), lon=slice(lon_bounds[0],lon_bounds[1]))
-    lon_fcst = data_subset.lon.values
-    lat_fcst = data_subset.lat.values
-    prcp_fcst_cum = np.insert(data_subset.prcp.values, 0, 0.0, axis=2)    # add zero accumulation at lead time 0
-    data_load.close()
-    prcp_fcst_1d = prcp_fcst_cum[:,:,1:-2,:,:] - prcp_fcst_cum[:,:,:-3,:,:]
-    prcp_fcst_3d = prcp_fcst_cum[:,:,3:,:,:] - prcp_fcst_cum[:,:,:-3,:,:]
+    requested_years = [*range(year_clm_start, year_clm_end+1)]
+    available_years = [year for year in requested_years if path.exists(f'{fcst_dir}total_precipitation_{system}_51_{year}_{month_start}.nc')]
+    if len(available_years) < len(requested_years):
+        missing_years = ' '.join(map(str, list(set(requested_years).difference(set(available_years)))))
+        warnings.warn(f"The following years of {system.upper()} forecast data could not be loaded:"+"\n"+missing_years)
+    if len(available_years) == 0:
+        raise Exception("No forecast data found to calculate percentiles.")
+    file_list = [f'{fcst_dir}total_precipitation_{system}_51_{year}_{month_start}.nc' for year in available_years]
+    ds = xr.open_mfdataset(file_list[0], preprocess=partial_func)
+    lon_fcst = ds.lon.values
+    lat_fcst = ds.lat.values
+    nmbs, nlts, nlatf, nlonf = ds.precip.shape
+    ds.close()
+    prcp_fcst_1d = np.full((nyrs,nmbs,nlts-2,nlatf,nlonf), np.nan, dtype=np.float32)
+    prcp_fcst_3d = np.full((nyrs,nmbs,nlts-2,nlatf,nlonf), np.nan, dtype=np.float32)
+    for iyr in range(len(available_years)):
+        print(f"Loading {system.upper()} forecast data for {available_years[iyr]} ...")    
+        ds = xr.open_mfdataset(file_list[iyr], preprocess=partial_func)
+        prcp_fcst_cum = 1e3*np.insert(ds.precip.values[:nmbs,:nlts,:,:], 0, 0.0, axis=1)    # add zero accumulation at lead time 0
+        ds.close()
+        prcp_fcst_1d[iyr,:,:,:] = np.maximum(0., prcp_fcst_cum[:,1:-2,:,:]-prcp_fcst_cum[:,:-3,:,:])
+        prcp_fcst_3d[iyr,:,:,:] = np.maximum(0., prcp_fcst_cum[:,3:,:,:]-prcp_fcst_cum[:,:-3,:,:])
    # Compose a moving window forecast sample, estimate model climatology, and use to quantile-map the threshold values
+    print("Calculating adjusted dry spell thresholds ...")
     thr_dry_adj = interpolate_and_map_threshold(prcp_fcst_1d, prcp_1d_pb_thr_dry, lat_fcst, lon_fcst, lat_chirps, lon_chirps)
+    print("Calculating adjusted wet spell thresholds ...")
     thr_wet_adj = interpolate_and_map_threshold(prcp_fcst_3d, prcp_3d_pb_thr_wet, lat_fcst, lon_fcst, lat_chirps, lon_chirps)
     return thr_dry_adj, thr_wet_adj
 
 
-def calculate_onset_fcst(region, month_start, year_fcst, system, thresh_dry, thresh_wet, len_dry_spell, lat_trgt, lon_trgt, data_dir):
-    lon_bounds, lat_bounds = domain_boundaries(region)
+
+# Function for calculating a rainy season onset date based on a new set of ensemble forecasts and adjusted thresholds
+
+def calculate_onset_fcst(region, month_start, year_fcst, system, thresh_dry, thresh_wet, len_dry_spell, lat_trgt, lon_trgt, fcst_dir):
+    lon_bnds, lat_bnds = domain_boundaries(region)
     day_start, nwks, ndts, ntwd = global_parameters()
     nlat = len(lat_trgt)
     nlon = len(lon_trgt)
    # Load file with new forecasts
-    filename_fcst = f'{data_dir}{system.upper()}_daily_{year_fcst}_{month_start}.nc'
-    data_load = xr.open_dataset(filename_fcst, engine='netcdf4')
-    data_subset = data_load.sel(lat=slice(lat_bounds[1],lat_bounds[0]), lon=slice(lon_bounds[0],lon_bounds[1]))
-    lon_fcst = data_subset.lon.values
-    lat_fcst = data_subset.lat.values[::-1]
-    prcp_fcst_cum = np.insert(data_subset.prcp.values[:,:,::-1,:], 0, 0.0, axis=1)    # add zero accumulation at lead time 0
-    data_load.close()
-    prcp_fcst_1d = prcp_fcst_cum[:,day_start:(day_start+ndts),:,:] - prcp_fcst_cum[:,(day_start-1):(day_start+ndts-1),:,:]
-    prcp_fcst_3d = prcp_fcst_cum[:,(day_start+2):(day_start+ndts+2),:,:] - prcp_fcst_cum[:,(day_start-1):(day_start+ndts-1),:,:]
+    filename = f'{fcst_dir}total_precipitation_{system}_51_{year_fcst}_{month_start}.nc'
+    if not path.exists(filename):
+        raise Exception("No forecast data found for selected year {year_fcst}.")
+    print("Loading and interpolating forecast data ...")
+    partial_func = partial(_preprocess, lon_bnds=lon_bnds, lat_bnds=lat_bnds)
+    ds = xr.open_mfdataset(filename, preprocess=partial_func)
+    lon_fcst = ds.lon.values
+    lat_fcst = ds.lat.values
+    prcp_fcst_cum = 1e3*np.insert(ds.precip.values, 0, 0.0, axis=1)
+    ds.close()
+    prcp_fcst_1d = np.maximum(0., prcp_fcst_cum[:,day_start:(day_start+ndts),:,:]-prcp_fcst_cum[:,(day_start-1):(day_start+ndts-1),:,:])
+    prcp_fcst_3d = np.maximum(0., prcp_fcst_cum[:,(day_start+2):(day_start+ndts+2),:,:]-prcp_fcst_cum[:,(day_start-1):(day_start+ndts-1),:,:])
    # Interpolate forecasts and record exceedances of the 1-day/3-day threshold
     nmbs = prcp_fcst_cum.shape[0]
     exc_1d = np.zeros((ndts,nmbs,nlat,nlon), dtype=bool)
@@ -159,6 +261,9 @@ def calculate_onset_fcst(region, month_start, year_fcst, system, thresh_dry, thr
         exc_3d[idt,:,:,:] = np.greater(prcp_fcst_3d_ip, thresh_wet[idt,None,:,:])
         mask[idt,:,:,:] = np.logical_or(np.isnan(prcp_fcst_1d_ip), np.isnan(thresh_dry[idt,None,:,:]))
    # Calculate rainy season onset forecast based on these exceedances
+    print("Calculating rainy season onset dates ...")
+    if not isinstance(len_dry_spell, np.ndarray):
+        len_dry_spell = np.full((nlat,nlon), len_dry_spell, dtype=int)
     onset_day_fcst = np.full((nmbs,nlat,nlon), np.nan, dtype=np.float32)
     for imb in range(nmbs):
         if np.all(mask[:,imb,:,:]):

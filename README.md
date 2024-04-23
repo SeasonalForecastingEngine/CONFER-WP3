@@ -1,5 +1,10 @@
 # CONFER-WP3
-This repository contains **Python code** developed within several sub-projects of work package 3 of the [CONFER](https://confer-h2020.eu/) project, one of the European Union’s Horizon 2020 research and innovation programmes. An **R-package for forecast evaluation** was also developed in this work package, and can be found [here](https://github.com/SeasonalForecastingEngine/SeaVal).
+This repository contains **Python code** developed within several sub-projects of work package 3 of the [CONFER](https://confer-h2020.eu/) project, one of the European Union’s Horizon 2020 research and innovation programmes.
+
+An **R-package for forecast evaluation** was also developed in this work package, and can be found [here](https://github.com/SeasonalForecastingEngine/SeaVal).
+
+
+CHIRPS v2.0 data are used for [daily precipitation amounts](https://data.chc.ucsb.edu/products/CHIRPS-2.0/global_daily/netcdf/p25/) at 0.25 degree horizonal resolution, and aggregated to [pentads](https://data.chc.ucsb.edu/products/CHIRPS-2.0/global_pentad/netcdf/) at 0.05 degree horizonal resolution.
 
 
 

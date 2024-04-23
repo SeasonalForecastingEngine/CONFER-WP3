@@ -31,13 +31,6 @@ def domain_boundaries(region):
 
 
 
-# Start and end year of the climatological reference period
-
-def climatological_reference_period():
-    return 1993, 2022
-
-
-
 # Various global parameters
 
 def global_parameters():
