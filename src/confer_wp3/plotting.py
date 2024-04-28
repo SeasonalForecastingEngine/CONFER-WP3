@@ -1,21 +1,14 @@
 
-# Functions for plotting. Some of this code was obtained from Joseph Bellier and then modified
-#  and extended for the purposes of this project.
-
 import numpy as np
-import matplotlib
-
 import matplotlib.pyplot as plt
 
-import pickle
+#import pickle
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 
 from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
-
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
 
 
 def get_nearest_grid_index(lon_exmpl, lat_exmpl, lon_grid, lat_grid):
@@ -110,8 +103,6 @@ def plot_fields (fields_list, lon, lat, lon_bounds, lat_bounds, main_title, subt
     plt.tight_layout(rect=[0,0,1,0.95])
     fig.suptitle(main_title, fontsize=16)
     plt.show()
-
-# ---------------------------------------------------------------------------------------------------------------------
 
 
 

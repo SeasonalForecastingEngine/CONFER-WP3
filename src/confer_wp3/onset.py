@@ -6,43 +6,10 @@ from os import path
 from functools import partial
 from datetime import datetime, timedelta
 
-from scipy.interpolate import RectBivariateSpline, interp1d
+from scipy.interpolate import interp1d
 
-from glp import domain_boundaries, global_parameters
-
-
-# Preprocessing function for loading data: renames coordinates, if necessary, and subsets to selected region
-
-def _preprocess(x, lon_bnds, lat_bnds):
-    coord_names = list(x.coords._names)
-    coord_dict = {}
-    for cstr in ['lat','lon','time']:
-        idx_matched = [i for i in range(len(coord_names)) if coord_names[i].find(cstr)>=0]
-        if len(idx_matched) != 1:
-            raise Exception("Unable to identify '{cstr}' coordinate")
-        if coord_names[idx_matched[0]] != cstr:
-            coord_dict[coord_names[idx_matched[0]]] = cstr
-        if list(x.keys())[0] != 'precip':
-            coord_dict[list(x.keys())[0]] = 'precip'
-    x = x.rename(coord_dict)
-    if x.lat.values[0] < x.lat.values[-1]:
-        return x.sel(lon=slice(*lon_bnds), lat=slice(*lat_bnds))
-    else:
-        return x.isel(lat=slice(None,None,-1)).sel(lon=slice(*lon_bnds), lat=slice(*lat_bnds))
-
-
-
-# Helper function to bilinearly interpolate ensemble forecasts
-
-def interpolate_forecasts(prcp_fcst, lat_fcst, lon_fcst, lat_trgt, lon_trgt):
-    nmbs, nlatf, nlonf = prcp_fcst.shape
-    prcp_fcst_itp = np.full((nmbs,len(lat_trgt),len(lon_trgt)), np.nan, dtype=np.float32)
-    for imb in range(nmbs):
-        if np.all(np.isnan(prcp_fcst[imb,:,:])):
-            continue
-        itpfct = RectBivariateSpline(lat_fcst, lon_fcst, prcp_fcst[imb,:,:], kx=1, ky=1, s=0)
-        prcp_fcst_itp[imb,:,:] = itpfct.__call__(lat_trgt, lon_trgt, grid=True)
-    return prcp_fcst_itp
+from .glp import domain_boundaries, global_parameters
+from .utils import _preprocess, interpolate_forecasts
 
 
 
@@ -199,13 +166,13 @@ def calculate_adjusted_thresholds(region, month_start, year_clm_start, year_clm_
     prcp_3d_pb_thr_wet = calculate_prob_below_threshold(prcp_3d, thr_wet)
    # Load hindcast data and calculate 1-day/3-day precipitation amounts
     requested_years = [*range(year_clm_start, year_clm_end+1)]
-    available_years = [year for year in requested_years if path.exists(f'{fcst_dir}total_precipitation_{system}_51_{year}_{month_start}.nc')]
+    available_years = [year for year in requested_years if path.exists(f'{fcst_dir}total_precipitation_{system}_{year}_{month_start}.nc')]
     if len(available_years) < len(requested_years):
         missing_years = ' '.join(map(str, list(set(requested_years).difference(set(available_years)))))
         warnings.warn(f"The following years of {system.upper()} forecast data could not be loaded:"+"\n"+missing_years)
     if len(available_years) == 0:
         raise Exception("No forecast data found to calculate percentiles.")
-    file_list = [f'{fcst_dir}total_precipitation_{system}_51_{year}_{month_start}.nc' for year in available_years]
+    file_list = [f'{fcst_dir}total_precipitation_{system}_{year}_{month_start}.nc' for year in available_years]
     ds = xr.open_mfdataset(file_list[0], preprocess=partial_func)
     lon_fcst = ds.lon.values
     lat_fcst = ds.lat.values
@@ -237,7 +204,7 @@ def calculate_onset_fcst(region, month_start, year_fcst, system, thresh_dry, thr
     nlat = len(lat_trgt)
     nlon = len(lon_trgt)
    # Load file with new forecasts
-    filename = f'{fcst_dir}total_precipitation_{system}_51_{year_fcst}_{month_start}.nc'
+    filename = f'{fcst_dir}total_precipitation_{system}_{year_fcst}_{month_start}.nc'
     if not path.exists(filename):
         raise Exception("No forecast data found for selected year {year_fcst}.")
     print("Loading and interpolating forecast data ...")

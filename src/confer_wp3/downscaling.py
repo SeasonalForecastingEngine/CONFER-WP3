@@ -7,29 +7,9 @@ from os import path
 from functools import partial
 from datetime import datetime
 from calendar import monthrange
+from scipy.interpolate import interp1d
 
-from scipy.interpolate import RectBivariateSpline, interp1d
-
-
-# Preprocessing function for loading data: renames coordinates, if necessary, and subsets to selected region
-
-def _preprocess(x, lon_bnds, lat_bnds):
-    coord_names = list(x.coords._names)
-    coord_dict = {}
-    for cstr in ['lat','lon','time']:
-        idx_matched = [i for i in range(len(coord_names)) if coord_names[i].find(cstr)>=0]
-        if len(idx_matched) != 1:
-            raise Exception("Unable to identify '{cstr}' coordinate")
-        if coord_names[idx_matched[0]] != cstr:
-            coord_dict[coord_names[idx_matched[0]]] = cstr
-        if list(x.keys())[0] != 'precip':
-            coord_dict[list(x.keys())[0]] = 'precip'
-    x = x.rename(coord_dict)
-    if x.lat.values[0] < x.lat.values[-1]:
-        return x.sel(lon=slice(*lon_bnds), lat=slice(*lat_bnds))
-    else:
-        return x.isel(lat=slice(None,None,-1)).sel(lon=slice(*lon_bnds), lat=slice(*lat_bnds))
-
+from .utils import _preprocess, interpolate_forecasts
 
 
 # Calculate the percentiles of the pentad climatology of the target data set
@@ -107,32 +87,17 @@ def calculate_pentad_daily_average(prcp_fcst, year_fcst, month_init, return_inde
 
 
 
-# Helper function to bilinearly interpolate ensemble forecasts
-
-def interpolate_forecasts(prcp_fcst, lat_fcst, lon_fcst, lat_target, lon_target):
-    d1, d2, nlatf, nlonf = prcp_fcst.shape
-    prcp_fcst_itp = np.full((d1,d2,len(lat_target),len(lon_target)), np.nan, dtype=np.float32)
-    for i1 in range(d1):
-        for i2 in range(d2):
-            if np.all(np.isnan(prcp_fcst[i1,i2,:,:])):
-                continue
-            itpfct = RectBivariateSpline(lat_fcst, lon_fcst, prcp_fcst[i1,i2,:,:], kx=1, ky=1, s=0)
-            prcp_fcst_itp[i1,i2,:,:] = itpfct.__call__(lat_target, lon_target, grid=True)
-    return prcp_fcst_itp
-
-
-
 # Calculate the percentiles of the pentad climatology of the ensemble forecast data set
 
 def calculate_forecast_percentiles(system, target, year_train_start, year_train_end, month_init, lon_target, lat_target, fcst_dir, filename_pct_fcst):
     requested_years = [*range(year_train_start, year_train_end+1)]
-    available_years = [year for year in requested_years if path.exists(f'{fcst_dir}total_precipitation_{system}_51_{year}_{month_init}.nc')]
+    available_years = [year for year in requested_years if path.exists(f'{fcst_dir}total_precipitation_{system}_{year}_{month_init}.nc')]
     if len(available_years) < len(requested_years):
         missing_years = ' '.join(map(str, list(set(requested_years).difference(set(available_years)))))
         warnings.warn(f"The following years of {system.upper()} forecast data could not be loaded:"+"\n"+missing_years)
     if len(available_years) == 0:
         raise Exception("No forecast data found to calculate percentiles.")
-    file_list = [f'{fcst_dir}total_precipitation_{system}_51_{year}_{month_init}.nc' for year in available_years]
+    file_list = [f'{fcst_dir}total_precipitation_{system}_{year}_{month_init}.nc' for year in available_years]
     lon_bnds = [np.floor(min(lon_target))-0.5, np.ceil(max(lon_target))+0.5]
     lat_bnds = [np.floor(min(lat_target))-0.5, np.ceil(max(lat_target))+0.5]
     partial_func = partial(_preprocess, lon_bnds=lon_bnds, lat_bnds=lat_bnds)
@@ -210,7 +175,7 @@ def quantile_mapping(prcp_fcst, pctl_fcst, pctl_target):
 # Load a new forecast and downscale to selected climatology via quantile mapping 
 
 def downscale_forecasts(system, year_fcst, month_init, pctl_fcst, pctl_target, lon_target, lat_target, fcst_dir, filename_precip_dwnsc):
-    filename = f'{fcst_dir}total_precipitation_{system}_51_{year_fcst}_{month_init}.nc'
+    filename = f'{fcst_dir}total_precipitation_{system}_{year_fcst}_{month_init}.nc'
     if not path.exists(filename):
         raise Exception("No forecast data found for selected year {year_fcst}.")
     lon_bnds = [np.floor(min(lon_target))-0.5, np.ceil(max(lon_target))+0.5]
@@ -260,30 +225,5 @@ def downscale_forecasts(system, year_fcst, month_init, pctl_fcst, pctl_target, l
             units='mm/day',),
         )
     da_prcp_daily_bc.to_netcdf(filename_precip_dwnsc)
-
-
-
-# Load and interpolate raw ensemble forecast
-
-def load_and_interpolate_forecast(system, year_fcst, month_init, lon_target, lat_target, fcst_dir):
-    filename = f'{fcst_dir}total_precipitation_{system}_51_{year_fcst}_{month_init}.nc'
-    if not path.exists(filename):
-        raise Exception("No forecast data found for selected year {year_fcst}.")
-    lon_bnds = [np.floor(min(lon_target))-0.5, np.ceil(max(lon_target))+0.5]
-    lat_bnds = [np.floor(min(lat_target))-0.5, np.ceil(max(lat_target))+0.5]
-    nlon = len(lon_target)
-    nlat = len(lat_target)
-    print("Loading and interpolating forecast data ...")
-    partial_func = partial(_preprocess, lon_bnds=lon_bnds, lat_bnds=lat_bnds)
-    ds = xr.open_mfdataset(filename, preprocess=partial_func)
-    lon_fcst = ds.lon.values
-    lat_fcst = ds.lat.values
-    prcp_fcst = ds.precip.values
-    ds.close()
-    nmbs, nlts, nlatf, nlonf = prcp_fcst.shape
-    prcp_daily = np.maximum(0., 1000.*np.diff(np.insert(prcp_fcst, 0, 0., axis=1), axis=1))
-    prcp_daily_ip = interpolate_forecasts(prcp_daily, lat_fcst, lon_fcst, lat_target, lon_target)
-    return prcp_daily_ip
-
 
 
