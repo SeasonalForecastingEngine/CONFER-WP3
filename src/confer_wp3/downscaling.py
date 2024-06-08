@@ -9,7 +9,7 @@ from datetime import datetime
 from calendar import monthrange
 from scipy.interpolate import interp1d
 
-from .utils import _preprocess, interpolate_forecasts
+from .utils import _preprocess, get_filename, interpolate_forecasts
 
 
 # Calculate the percentiles of the pentad climatology of the target data set
@@ -91,13 +91,14 @@ def calculate_pentad_daily_average(prcp_fcst, year_fcst, month_init, return_inde
 
 def calculate_forecast_percentiles(system, target, year_train_start, year_train_end, month_init, lon_target, lat_target, fcst_dir, filename_pct_fcst):
     requested_years = [*range(year_train_start, year_train_end+1)]
-    available_years = [year for year in requested_years if path.exists(f'{fcst_dir}total_precipitation_{system}_{year}_{month_init}.nc')]
+    available_years = [year for year in requested_years if path.exists(get_filename(fcst_dir, system, year, month_init))]
+    
     if len(available_years) < len(requested_years):
         missing_years = ' '.join(map(str, list(set(requested_years).difference(set(available_years)))))
         warnings.warn(f"The following years of {system.upper()} forecast data could not be loaded:"+"\n"+missing_years)
     if len(available_years) == 0:
         raise Exception("No forecast data found to calculate percentiles.")
-    file_list = [f'{fcst_dir}total_precipitation_{system}_{year}_{month_init}.nc' for year in available_years]
+    file_list = [get_filename(fcst_dir, system, year, month_init) for year in available_years]
     lon_bnds = [np.floor(min(lon_target))-0.5, np.ceil(max(lon_target))+0.5]
     lat_bnds = [np.floor(min(lat_target))-0.5, np.ceil(max(lat_target))+0.5]
     partial_func = partial(_preprocess, lon_bnds=lon_bnds, lat_bnds=lat_bnds)
@@ -175,7 +176,7 @@ def quantile_mapping(prcp_fcst, pctl_fcst, pctl_target):
 # Load a new forecast and downscale to selected climatology via quantile mapping 
 
 def downscale_forecasts(system, year_fcst, month_init, pctl_fcst, pctl_target, lon_target, lat_target, fcst_dir, filename_precip_dwnsc):
-    filename = f'{fcst_dir}total_precipitation_{system}_{year_fcst}_{month_init}.nc'
+    filename = get_filename(fcst_dir, system, year_fcst, month_init)
     if not path.exists(filename):
         raise Exception("No forecast data found for selected year {year_fcst}.")
     lon_bnds = [np.floor(min(lon_target))-0.5, np.ceil(max(lon_target))+0.5]

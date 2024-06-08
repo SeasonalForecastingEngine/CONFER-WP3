@@ -9,15 +9,30 @@ from functools import partial
 from scipy.interpolate import RectBivariateSpline
 
 
+month_init_dict = {'jan':1 ,'feb':2, 'mar':3, 'apr':4, 'may':5, 'jun':6, 'jul':7, 'aug':8, 'sep':9, 'oct':10, 'nov':11, 'dec':12}
+
+
+# Helper function for building the name of the forecast file
+
+def get_filename(fcst_dir, system, year_fcst, month_init):
+    if fcst_dir[-5:-1] == 'grib':
+        return  f'{fcst_dir}{system}_{month_init}_{year_fcst}.grib'
+    elif fcst_dir[-3:-1] == 'nc':
+        return f'{fcst_dir}total_precipitation_{system}_{year_fcst}_{month_init_dict[month_init]}.nc'
+    else:
+        raise Exception("Unable to identify file type (grib/nc) based on file path")
+
+
+
 # Helper function for loading data: renames coordinates, if necessary, and subsets to selected region
 
 def _preprocess(x, lon_bnds, lat_bnds):
     coord_names = list(x.coords._names)
     coord_dict = {}
-    for cstr in ['lat','lon','time']:
+    for cstr in ['lat','lon']:#,'time']:
         idx_matched = [i for i in range(len(coord_names)) if coord_names[i].find(cstr)>=0]
         if len(idx_matched) != 1:
-            raise Exception("Unable to identify '{cstr}' coordinate")
+            raise Exception(f"Unable to identify '{cstr}' coordinate")
         if coord_names[idx_matched[0]] != cstr:
             coord_dict[coord_names[idx_matched[0]]] = cstr
         if list(x.keys())[0] != 'precip':
@@ -48,7 +63,7 @@ def interpolate_forecasts(prcp_fcst, lat_fcst, lon_fcst, lat_target, lon_target)
 # Load and interpolate raw ensemble forecast
 
 def load_and_interpolate_forecast(system, year_fcst, month_init, lon_target, lat_target, fcst_dir):
-    filename = f'{fcst_dir}total_precipitation_{system}_{year_fcst}_{month_init}.nc'
+    filename = get_filename(fcst_dir, system, year_fcst, month_init)
     if not path.exists(filename):
         raise Exception("No forecast data found for selected year {year_fcst}.")
     lon_bnds = [np.floor(min(lon_target))-0.5, np.ceil(max(lon_target))+0.5]
