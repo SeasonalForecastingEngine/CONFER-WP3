@@ -9,7 +9,7 @@ from datetime import datetime
 from calendar import monthrange
 from scipy.interpolate import interp1d
 
-from .utils import _preprocess, get_filename, interpolate_forecasts
+from .utils import _preprocess, month_init_dict, get_filename, interpolate_forecasts
 
 
 # Calculate the percentiles of the pentad climatology of the target data set
@@ -64,8 +64,8 @@ def calculate_pentad_daily_average(prcp_fcst, year_fcst, month_init, return_inde
     pentad_end_idx = np.zeros(npts, dtype=np.int32)
     pentad_end_idx[0] = 4
     for imt in range(nlm):
-        year_valid = year_fcst + (month_init+imt-1)//12
-        month_valid = 1 + (month_init+imt-1)%12
+        year_valid = year_fcst + (month_init_dict[month_init]+imt-1)//12
+        month_valid = 1 + (month_init_dict[month_init]+imt-1)%12
         days_this_month = 0
         for ipt in range(5):
             days_this_month += 5
@@ -197,8 +197,8 @@ def downscale_forecasts(system, year_fcst, month_init, pctl_fcst, pctl_target, l
     prcp_pentad_daily_avg_ip = interpolate_forecasts(prcp_pentad_daily_avg, lat_fcst, lon_fcst, lat_target, lon_target)
     prcp_daily_bc = np.full((nmbs,pentad_end_idx[-1]+1,nlat,nlon), np.nan, dtype=np.float32)
     npts = len(pentad_end_idx)
-    for ipt in range(npts):                      # ipt: pentad after forecast initialization
-        jpt = (6*(month_init-1) + ipt) % 72      # jpt: pentad of year
+    for ipt in range(npts):                                   # ipt: pentad after forecast initialization
+        jpt = (6*(month_init_dict[month_init]-1) + ipt) % 72  # jpt: pentad of year
         if ipt % 10 == 0:
             print(f"Processing pentad {ipt+1}/{npts} ...")
         if ipt == 0:
