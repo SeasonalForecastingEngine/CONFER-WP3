@@ -644,6 +644,23 @@ findlibs = "*"
 numpy = "*"
 
 [[package]]
+name = "eofs"
+version = "1.4.1"
+description = "EOF analysis in Python"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "eofs-1.4.1-py3-none-any.whl", hash = "sha256:90c0142475b9c9fc421b74a89754af05b21e20b8bb65cd90821fcc8db35e9da4"},
+    {file = "eofs-1.4.1.tar.gz", hash = "sha256:7b5ce336f06d76f79c29e8615fe551de5f1dcc35203dd4745281cc9468e548df"},
+]
+
+[package.dependencies]
+numpy = "*"
+
+[package.extras]
+extras = ["cdms2", "cdutil", "iris", "xarray"]
+
+[[package]]
 name = "exceptiongroup"
 version = "1.2.1"
 description = "Backport of PEP 654 (exception groups)"
@@ -3230,4 +3247,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "128e830afd6609e5132bd342b8fdcc30ed8b3e7d294cb5d10c0dfa1a62106877"
+content-hash = "852f49488e5eabf1e07a53be2061ae3d736a50061433f04de722c1948ecb39aa"
