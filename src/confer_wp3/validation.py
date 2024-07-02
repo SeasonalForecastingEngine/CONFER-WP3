@@ -270,3 +270,32 @@ def validate_pcs(anomalies_normal, eofs_reshaped, pcs, lat, lon, year, period_tr
     validate_pcs_plotter(sfl_values, 'Scaled Normalized Anomalies PCs - Reference', size=(10, 3))
 
 
+def plot_time_series(df, index_name, comparison=False):
+    """
+    Plot the time series of the standardized anomaly index.
+
+    Parameters:
+    - df (pandas.DataFrame): The DataFrame containing the time series data with columns 'year', 'month', and 'standardized_anomaly'.
+                             If comparison is True, the DataFrame should also contain a 'fl' column for the reference values.
+    - index_name (str): The name of the index being plotted (e.g., 'n34', 'dmi').
+    - comparison (bool, optional): Whether to include a comparison with reference values. Default is False.
+
+    Returns:
+    - None: The function generates and displays a plot of the time series.
+    """
+    df['date'] = pd.to_datetime(df[['year', 'month']].assign(day=1))
+    df = df.sort_values('date')
+
+    plt.figure(figsize=(12, 6))
+    if comparison:
+        plt.plot(df['date'], df['standardized_anomaly'], label=f"{index_name} Calculated", color='b')
+        plt.plot(df['date'], df['fl'], label=f"{index_name} Reference", color='r', linestyle='--')
+    else:
+        plt.plot(df['date'], df['standardized_anomaly'], label=f"{index_name} Index", color='b')
+    plt.title(f"Time Series of {index_name} Index")
+    plt.xlabel("Time")
+    plt.ylabel(f"{index_name} Index Value")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+

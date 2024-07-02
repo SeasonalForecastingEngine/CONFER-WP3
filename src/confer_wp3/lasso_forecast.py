@@ -132,6 +132,13 @@ def compute_eofs_pcs(anomalies_normal, n_eofs):
     eofs = solver.eofs(neofs=n_eofs)
     pcs = solver.pcs(npcs=n_eofs)
     variance_fraction = solver.varianceFraction(neigs=n_eofs)
+
+    # Code for flipping value of first EOF if it is negative. Ask Michael whether I should then only flip the first, or flip them all.
+    # # Check if the first EOF is predominantly negative
+    # if np.sum(eofs[0] < 0) > np.sum(eofs[0] > 0):
+    #     # If it is, flip the sign of the first EOF and its corresponding PC
+    #     eofs[0] *= -1
+    #     pcs[:, 0] *= -1
     
     return eofs, pcs, variance_fraction
 
@@ -190,236 +197,130 @@ def get_region_indices(region):
     return indices_definitions[region]
 
 
-def standardize_index(data, index_name, period_clm, year_fcst, month_init, before = False):
-    # Check if trying to calculate for first month and year
-    first_year = data['year'].min().item()
-    if year_fcst == first_year and month_init == 1:
-        raise ValueError("Cannot calculate the index for the first month in the first year of the dataset.")
-    
+
+# Helper functions for standardize_index and standardize_index_diff1
+def get_subset(data, region_name):
+        region = get_region_indices(region_name)
+        return data.sel(lat=slice(region['lat_min'], region['lat_max']), 
+                        lon=slice(region['lon_min'], region['lon_max']))
+
+def calc_index(subset):
+        return subset.mean(dim=['lat', 'lon'])
+
+def standardize_index(data, index_name, period_clm, year_fcst, month_init):
     # Calculate the index for the entire dataset
-    if index_name in ["n4", "dmi", "wnp", "wsp"]: 
-        region_1 = get_region_indices(f"{index_name}_1")
-        region_2 = get_region_indices(f"{index_name}_2")
-        subset_1 = data.sel(lat=slice(region_1['lat_min'], region_1['lat_max']), lon=slice(region_1['lon_min'], region_1['lon_max']))
-        subset_2 = data.sel(lat=slice(region_2['lat_min'], region_2['lat_max']), lon=slice(region_2['lon_min'], region_2['lon_max']))
-        
+    if index_name in ["n4", "wnp", "wsp"]: 
+        subset_1 = get_subset(data, f"{index_name}_1")
+        subset_2 = get_subset(data, f"{index_name}_2")
+        index = calc_index(xr.concat([subset_1, subset_2], dim='lat'))
+    elif index_name in ["dmi", "wpg"]:
         if index_name == "dmi":
-            index_dmi_1 = subset_1.mean(dim=['lat', 'lon'])
-            index_dmi_2 = subset_2.mean(dim=['lat', 'lon'])
+            # Swapped ot get correct index at the end
+            subset_2 = get_subset(data, f"dmi_1")
+            subset_1 = get_subset(data, f"dmi_2")
+        else:
+            subset_1 = get_subset(data, index_name)
+            subset_n4_1 = get_subset(data, "n4_1")
+            subset_n4_2 = get_subset(data, "n4_2")
+            subset_2 = xr.concat([subset_n4_1, subset_n4_2], dim='lat')
             
-            if before:
-                # Select the reference period from the indices
-                ref_data_dmi_1 = index_dmi_1.sel(year=slice(period_clm[0], period_clm[1]))
-                ref_data_dmi_2 = index_dmi_2.sel(year=slice(period_clm[0], period_clm[1]))
+        index_1 = calc_index(subset_1)
+        index_2 = calc_index(subset_2)
 
-                # Calculate the climatology (mean) and standard deviation during the reference period for both indices
-                climatology_dmi_1 = ref_data_dmi_1.mean(dim='year')
-                climatology_std_dmi_1 = ref_data_dmi_1.std(dim='year', ddof=1)
-                climatology_dmi_2 = ref_data_dmi_2.mean(dim='year')
-                climatology_std_dmi_2 = ref_data_dmi_2.std(dim='year', ddof=1)
-
-                # Standardize the entire index data
-                standardized_index_dmi_1 = (index_dmi_1 - climatology_dmi_1) / climatology_std_dmi_1
-                standardized_index_dmi_2 = (index_dmi_2 - climatology_dmi_2) / climatology_std_dmi_2
-
-                # Calculate the difference between the standardized indices
-                index = standardized_index_dmi_1 - standardized_index_dmi_2
-            else:
-                # Calculate the difference between the indices
-                index = index_dmi_1 - index_dmi_2
-        else:
-            combined_subset = xr.concat([subset_1, subset_2], dim='lat')
-            index = combined_subset.mean(dim=['lat', 'lon'])
-
-    elif index_name == "wpg":
-        # Calculate the index for the entire dataset
-        region_wp = get_region_indices(index_name)
-        region_n4_1 = get_region_indices("n4_1")
-        region_n4_2 = get_region_indices("n4_2")
-        subset_wp = data.sel(lat=slice(region_wp['lat_min'], region_wp['lat_max']), lon=slice(region_wp['lon_min'], region_wp['lon_max']))
-        subset_n4_1 = data.sel(lat=slice(region_n4_1['lat_min'], region_n4_1['lat_max']), lon=slice(region_n4_1['lon_min'], region_n4_1['lon_max']))
-        subset_n4_2 = data.sel(lat=slice(region_n4_2['lat_min'], region_n4_2['lat_max']), lon=slice(region_n4_2['lon_min'], region_n4_2['lon_max']))
-        combined_subset_n4 = xr.concat([subset_n4_1, subset_n4_2], dim='lat')
-        
-        index_wp = subset_wp.mean(dim=['lat', 'lon'])
-        index_n4 = combined_subset_n4.mean(dim=['lat', 'lon'])
-
-        if before:
-            # Select the reference period from the indices
-            ref_data_wp = index_wp.sel(year=slice(period_clm[0], period_clm[1]))
-            ref_data_n4 = index_n4.sel(year=slice(period_clm[0], period_clm[1]))
-
-            # Calculate the climatology (mean) and standard deviation during the reference period for both indices
-            climatology_wp = ref_data_wp.mean(dim='year')
-            climatology_std_wp = ref_data_wp.std(dim='year', ddof=1)
-            climatology_n4 = ref_data_n4.mean(dim='year')
-            climatology_std_n4 = ref_data_n4.std(dim='year', ddof=1)
-
-            # Standardize the entire index data
-            standardized_index_wp = (index_wp - climatology_wp) / climatology_std_wp
-            standardized_index_n4 = (index_n4 - climatology_n4) / climatology_std_n4
-
-            # Calculate the difference between the standardized indices
-            index = standardized_index_n4 - standardized_index_wp
-        else:
-            # Calculate the difference between the indices
-            index = index_n4 - index_wp
-
-    else:
-        region = get_region_indices(index_name)
-        subset = data.sel(lat=slice(region['lat_min'], region['lat_max']), lon=slice(region['lon_min'], region['lon_max']))
-        index = subset.mean(dim=['lat', 'lon'])
-
-    if before:
-        if month_init == 1:
-            current_datapoint = index.sel(year=year_fcst-1, month=12)
-        else:
-            current_datapoint = index.sel(year=year_fcst, month=month_init-1)
-
-        return current_datapoint
-    
-    else:
-        # Select the reference period from the index
-        ref_data = index.sel(year=slice(period_clm[0], period_clm[1]))
-
-        # Calculate the climatology (mean) and standard deviation during the reference period
-        climatology = ref_data.mean(dim=['year'])
-        climatology_std = ref_data.std(dim=['year'], ddof = 1)
-
-        # Standardize the current data point based on data from previous month
-        if month_init == 1:
-            current_datapoint = index.sel(year = year_fcst-1, month = 12)
-            climatology = climatology.sel(month = 12)
-            climatology_std = climatology_std.sel(month = 12)
-        else:
-            current_datapoint = index.sel(year = year_fcst, month = month_init-1)
-            climatology = climatology.sel(month = month_init-1)
-            climatology_std = climatology_std.sel(month = month_init-1)
-        
-        anomalies = current_datapoint - climatology
-        standardized_anomalies = anomalies / climatology_std
-        
-        return standardized_anomalies
-
-
-def standardize_index_diff1(data, index_name, period_clm, year_fcst, month_init, before = False):
-    # Check if trying to calculate for first month and year
-    first_year = data['year'].min().item()
-    if year_fcst == first_year and month_init == 1:
-        raise ValueError("Cannot calculate the index for the first month in the first year of the dataset.")
-    
-    # Calculate the index for the entire dataset
-    if index_name == "n34":
-        region = get_region_indices(index_name)
-        subset = data.sel(lat=slice(region['lat_min'], region['lat_max']), lon=slice(region['lon_min'], region['lon_max']))
-        index = subset.mean(dim=['lat', 'lon'])
-    elif index_name == "dmi":
-        region_dmi_1 = get_region_indices("dmi_1")
-        region_dmi_2 = get_region_indices("dmi_2")
-        subset_dmi_1 = data.sel(lat=slice(region_dmi_1['lat_min'], region_dmi_1['lat_max']), lon=slice(region_dmi_1['lon_min'], region_dmi_1['lon_max']))
-        subset_dmi_2 = data.sel(lat=slice(region_dmi_2['lat_min'], region_dmi_2['lat_max']), lon=slice(region_dmi_2['lon_min'], region_dmi_2['lon_max']))
-        index_dmi_1 = subset_dmi_1.mean(dim=['lat', 'lon'])
-        index_dmi_2 = subset_dmi_2.mean(dim=['lat', 'lon'])
-
-        if before:
-                # Select the reference period from the indices
-                ref_data_dmi_1 = index_dmi_1.sel(year=slice(period_clm[0], period_clm[1]))
-                ref_data_dmi_2 = index_dmi_2.sel(year=slice(period_clm[0], period_clm[1]))
-
-                # Calculate the climatology (mean) and standard deviation during the reference period for both indices
-                climatology_dmi_1 = ref_data_dmi_1.mean(dim='year')
-                climatology_std_dmi_1 = ref_data_dmi_1.std(dim='year', ddof=1)
-                climatology_dmi_2 = ref_data_dmi_2.mean(dim='year')
-                climatology_std_dmi_2 = ref_data_dmi_2.std(dim='year', ddof=1)
-
-                # Standardize the entire index data
-                standardized_index_dmi_1 = (index_dmi_1 - climatology_dmi_1) / climatology_std_dmi_1
-                standardized_index_dmi_2 = (index_dmi_2 - climatology_dmi_2) / climatology_std_dmi_2
-
-                # Calculate the difference between the standardized indices
-                index = standardized_index_dmi_1 - standardized_index_dmi_2
-
-        else:
-            # Calculate the difference between the indices
-            index = index_dmi_1 - index_dmi_2
-    else:
-        print(f"Diff1 not implemented for index {index_name}")
-        raise TypeError(f"Diff1 not implemented for index {index_name}")
-
-    # Select the reference period from the index
-    ref_data = index.sel(year=slice(period_clm[0], period_clm[1]))
-
-    if before:
-        # Calculate the climatology (mean) and standard deviation during the reference period
-        climatology = ref_data.mean(dim='year')
-        climatology_std = ref_data.std(dim='year', ddof=1)
+        # Calculate the climatology (mean) and standard deviation during the reference period for both indices
+        climatology_1 = index_1.sel(year=slice(*period_clm)).mean(dim='year')
+        climatology_std_1 = index_1.sel(year=slice(*period_clm)).std(dim='year', ddof=1)
+        climatology_2 = index_2.sel(year=slice(*period_clm)).mean(dim='year')
+        climatology_std_2 = index_2.sel(year=slice(*period_clm)).std(dim='year', ddof=1)
 
         # Standardize the entire index data
-        standardized_index = (index - climatology) / climatology_std
+        standardized_index_1 = (index_1 - climatology_1) / climatology_std_1
+        standardized_index_2 = (index_2 - climatology_2) / climatology_std_2
 
-        # Calculate the differences for all 12 months, including January using December from the previous year
-        diff_list = []
-        for year in range(period_clm[0], period_clm[1] + 1):
-            for month in range(1, 13):
-                if month == 1:
-                    if year > period_clm[0]:  # Ensure we have the previous year's December data
-                        current_value = standardized_index.sel(year=year, month=1)
-                        previous_value = standardized_index.sel(year=year-1, month=12)
-                        diff = (current_value - previous_value).assign_coords(year=year, month=month)
-                        diff_list.append(diff)
-                else:
-                    current_value = standardized_index.sel(year=year, month=month)
-                    previous_value = standardized_index.sel(year=year, month=month-1)
-                    diff = (current_value - previous_value).assign_coords(year=year, month=month)
-                    diff_list.append(diff)
-
+        # Calculate the difference between the standardized indices
+        index = standardized_index_2 - standardized_index_1
     else:
-        # Calculate the differences for all 12 months, including January using December from the previous year
-        diff_list = []
-        
-        for year in range(period_clm[0], period_clm[1] + 1):
-            for month in range(1, 13):
-                if month == 1:
-                    if year > period_clm[0]:  # Ensure we have the previous year's December data
-                        current_value = ref_data.sel(year=year, month=1)
-                        previous_value = ref_data.sel(year=year-1, month=12)
-                        diff = (current_value - previous_value).assign_coords(year=year, month=month)
-                        diff_list.append(diff)
-                else:
-                    current_value = ref_data.sel(year=year, month=month)
-                    previous_value = ref_data.sel(year=year, month=month-1)
-                    diff = (current_value - previous_value).assign_coords(year=year, month=month)
-                    diff_list.append(diff)
+        index = calc_index(get_subset(data, index_name))
+
+    # Get the appropriate datapoint
+    if month_init == 1:
+        current_datapoint = index.sel(year=year_fcst-1, month=12)
+    else:
+        current_datapoint = index.sel(year=year_fcst, month=month_init-1)
+
+    if index_name in ["dmi", "wpg"]:
+        return current_datapoint
     
-    diff_data = xr.concat(diff_list, dim='time')
+    # Select the reference period from the index
+    ref_data = index.sel(year=slice(*period_clm))
 
-    climatology = diff_data.mean(dim='time')
-    climatology_std = diff_data.std(dim='time', ddof = 1)
+    # Calculate the climatology (mean) and standard deviation during the reference period
+    climatology = ref_data.mean('year').sel(month=current_datapoint.month)
+    climatology_std = ref_data.std('year').sel(month=current_datapoint.month)
+    
+    return (current_datapoint - climatology) / climatology_std
 
-    if before:
-        # Standardize the current data point based on data from the previous month
-        if month_init == 1:
-            current_datapoint = standardized_index.sel(year = year_fcst, month = 1)
-            previous_datapoint = standardized_index.sel(year = year_fcst-1, month = 12)
-        else:
-            current_datapoint = standardized_index.sel(year = year_fcst, month = month_init)
-            previous_datapoint = standardized_index.sel(year = year_fcst, month = month_init-1)
+
+def standardize_index_diff1(data, index_name, period_clm, year_fcst, month_init):
+    # Calculate the index for the entire dataset
+    if index_name == "n34":
+        index = calc_index(get_subset(data, index_name))
+        # Calculate the climatology (mean) and standard deviation during the reference period
+        climatology = index.sel(year=slice(*period_clm)).mean(dim='year')
+        climatology_std = index.sel(year=slice(*period_clm)).std(dim='year', ddof=1)
+
+        # Standardize the entire index data
+        index = (index - climatology) / climatology_std
+    elif index_name == "dmi":
+        index_1 = calc_index(get_subset(data, "dmi_1"))
+        index_2 = calc_index(get_subset(data, "dmi_2"))
+        # Calculate the climatology (mean) and standard deviation during the reference period for both indices
+        climatology_1 = index_1.sel(year=slice(*period_clm)).mean(dim='year')
+        climatology_std_1 = index_1.sel(year=slice(*period_clm)).std(dim='year', ddof=1)
+        climatology_2 = index_2.sel(year=slice(*period_clm)).mean(dim='year')
+        climatology_std_2 = index_2.sel(year=slice(*period_clm)).std(dim='year', ddof=1)
+
+        # Standardize the entire index data
+        index_1 = (index_1 - climatology_1) / climatology_std_1
+        index_2 = (index_2 - climatology_2) / climatology_std_2
+        # Calculate the difference between the indices
+        index = index_1 - index_2
     else:
-        # Standardize the current data point based on data from the previous month
-        if month_init == 1:
-            current_datapoint = index.sel(year = year_fcst, month = 1)
-            previous_datapoint = index.sel(year = year_fcst-1, month = 12)
-        else:
-            current_datapoint = index.sel(year = year_fcst, month = month_init)
-            previous_datapoint = index.sel(year = year_fcst, month = month_init-1)
+        raise TypeError(f"Diff1 not implemented for index {index_name}")
 
-    # Calculate the difference between the current and previous month
-    difference = current_datapoint - previous_datapoint
+    # Calculate the difference
+    if month_init == 1:
+        current = index.sel(year=year_fcst-1, month=12)
+        previous = index.sel(year=year_fcst-1, month=11)
+    elif month_init == 2:
+        current = index.sel(year=year_fcst, month=1)
+        previous = index.sel(year=year_fcst-1, month=12)
+    else:
+        current = index.sel(year=year_fcst, month=month_init-1)
+        previous = index.sel(year=year_fcst, month=month_init-2)
+    
+    difference = current - previous
 
-    anomalies = difference - climatology
-    standardized_anomalies = anomalies / climatology_std
+    return difference
+"""
+    # Code that standardizes one more time after calculating differences.
+    
+    # Calculate climatology and standard deviation of differences
+    diff_data = xr.concat([
+        ref_data.diff('month').assign_coords(month=range(2, 13)),
+        (ref_data.shift(year=-1).isel(month=0) - ref_data.isel(month=-1)).assign_coords(month=1)
+    ], dim='month')
+    
+    climatology = diff_data.mean('year')
+    climatology_std = diff_data.std('year')
+
+    # Calculate anomalies and standardize
+    anomalies = difference - climatology.sel(month=month_init)
+    standardized_anomalies = anomalies / climatology_std.sel(month=month_init)
     
     return standardized_anomalies
+"""
+
 
 
 def calculate_local_stdv(season, period_clm, anomaly_dir):      # Should be calculated when calculating the anomalies and saved out in EOF files 
