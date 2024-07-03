@@ -8,6 +8,7 @@ import pandas as pd
 
 from scipy.stats import norm
 
+
 def validate_anomalies1(prec_data, anomalies, lat, lon, year_index = 0):
     """
     Visualize the original precipitation data and calculated anomalies on a map for a single year.
@@ -298,4 +299,48 @@ def plot_time_series(df, index_name, comparison=False):
     plt.legend()
     plt.grid(True)
     plt.show()
+            
+
+def validate_indices(era5_indices, filepath_indices, period_train, year_fcst):
+    """
+    Validates calculated indices against reference indices and prints comparisons for specified forecast months.
+
+    Args:
+    era5_indices (pd.DataFrame): Dataframe containing ERA5 indices with columns 'year', 'month', and index names.
+    filepath_indices (str): Filepath prefix where reference index files are located.
+    period_train (tuple): A tuple containing the start and end years (inclusive) for the training period.
+    year_fcst (int): The forecast year for which the validation is being performed.
+
+    Returns:
+    None
+    """
+    for index in era5_indices.columns.difference(['year', 'month']):  # Skip 'year' and 'month' columns
+        print(f"Validating index: {index}")
+
+        # Extract the relevant columns for this index
+        index_df = era5_indices[['year', 'month', index]].rename(columns={index: 'standardized_anomaly'})
+        
+        # Process the reference dataframe for the given index
+        reference_df = pd.read_csv(f"{filepath_indices}{index}_full.csv")
+        # Filter the reference dataframe for the specified time range
+        reference_df_filtered = reference_df[(reference_df['year'] >= period_train[0]) & (reference_df['year'] <= period_train[1])][['year', 'month', 'fl']]
+        # Drop duplicate rows
+        reference_df_filtered = reference_df_filtered.drop_duplicates()
+        
+        # Merge and plot dataframes
+        merged_df = pd.merge(index_df, reference_df_filtered, on=['year', 'month'], suffixes=('_calculated', '_reference'))
+        plot_time_series(merged_df, index, comparison=True)
+
+        # Print some values for comparison
+        for month in range(1, 5):
+            print(f"Standardized anomaly (calculated index) for forecast year: {year_fcst}, forecast month = {month} (based on data from month before):")
+            
+            # Calculate the value for the previous month
+            prev_year, prev_month = (year_fcst - 1, 12) if month == 1 else (year_fcst, month - 1)
+            # Get the calculated and reference values
+            calculated_value = era5_indices[(era5_indices['year'] == prev_year) & (era5_indices['month'] == prev_month)][index].values[0]
+            reference_value = reference_df[(reference_df["year"] == prev_year) & (reference_df["month"] == prev_month)].fl.values[0]
+            print(f'Calculated value: {calculated_value}')
+            print(f'Reference value: {reference_value}')
+            print("\n")
 

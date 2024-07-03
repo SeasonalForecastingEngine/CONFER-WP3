@@ -6,6 +6,7 @@ import pandas as pd
 import xarray as xr
 
 from eofs.standard import Eof
+from functools import reduce
 from scipy.stats  import norm
 from scipy.interpolate import interp1d
 
@@ -197,25 +198,60 @@ def get_region_indices(region):
     return indices_definitions[region]
 
 
-
 # Helper functions for standardize_index and standardize_index_diff1
 def get_subset(data, region_name):
-        region = get_region_indices(region_name)
-        return data.sel(lat=slice(region['lat_min'], region['lat_max']), 
-                        lon=slice(region['lon_min'], region['lon_max']))
+    """
+    Extracts a subset of the data for a specified region.
+
+    Args:
+    data (xarray.Dataset): The dataset containing the data to be subset.
+    region_name (str): The name of the region to extract.
+
+    Returns:
+    xarray.Dataset: A subset of the original dataset for the specified region.
+    """
+    region = get_region_indices(region_name)
+    return data.sel(lat=slice(region['lat_min'], region['lat_max']), 
+                    lon=slice(region['lon_min'], region['lon_max']))
+
 
 def calc_index(subset):
-        return subset.mean(dim=['lat', 'lon'])
+    """
+    Calculates the mean value of the data subset over the latitude and longitude dimensions.
+
+    Args:
+    subset (xarray.Dataset): The subset of data to calculate the index for.
+
+    Returns:
+    xarray.DataArray: The mean value of the subset over the latitude and longitude dimensions.
+    """
+    return subset.mean(dim=['lat', 'lon'])
+    
 
 def standardize_index(data, index_name, period_clm, year_fcst, month_init):
-    # Calculate the index for the entire dataset
-    if index_name in ["n4", "wnp", "wsp"]: 
+    """
+    Calculates and standardizes an index for a given dataset, index name, reference period, forecast year, and initialization month.
+
+    Args:
+    data (xarray.Dataset): The dataset containing the data to be used for index calculation.
+    index_name (str): The name of the index to be calculated (e.g., 'n4', 'wnp'. See get_region_indices() for the possible indices.).
+    period_clm (tuple): A tuple containing the start and end years (inclusive) for the reference period.
+    year_fcst (int): The forecast year for which the index is being standardized.
+    month_init (int): The initialization month for the forecast.
+
+    Returns:
+    xarray.DataArray: The standardized index value for the specified forecast year and initialization month.
+    """
+    # Calculate the index
+    if index_name in ["n4", "wnp", "wsp"]:
+        # Indices calculated from two regions
         subset_1 = get_subset(data, f"{index_name}_1")
         subset_2 = get_subset(data, f"{index_name}_2")
         index = calc_index(xr.concat([subset_1, subset_2], dim='lat'))
     elif index_name in ["dmi", "wpg"]:
+        # Indices that are a difference between regions
         if index_name == "dmi":
-            # Swapped ot get correct index at the end
+            # Swapped to get correct index at the end
             subset_2 = get_subset(data, f"dmi_1")
             subset_1 = get_subset(data, f"dmi_2")
         else:
@@ -240,6 +276,7 @@ def standardize_index(data, index_name, period_clm, year_fcst, month_init):
         # Calculate the difference between the standardized indices
         index = standardized_index_2 - standardized_index_1
     else:
+        # Indices calculated from one region
         index = calc_index(get_subset(data, index_name))
 
     # Get the appropriate datapoint
@@ -262,13 +299,25 @@ def standardize_index(data, index_name, period_clm, year_fcst, month_init):
 
 
 def standardize_index_diff1(data, index_name, period_clm, year_fcst, month_init):
-    # Calculate the index for the entire dataset
+    """
+    Calculates the standardized difference between the current and previous month's index values for a given dataset, index name, reference period, forecast year, and initialization month.
+
+    Args:
+    data (xarray.Dataset): The dataset containing the data to be used for index calculation.
+    index_name (str): The name of the index to be calculated ('n34' or 'dmi').
+    period_clm (tuple): A tuple containing the start and end years (inclusive) for the reference period.
+    year_fcst (int): The forecast year for which the index difference is being calculated.
+    month_init (int): The initialization month for the forecast.
+
+    Returns:
+    xarray.DataArray: The standardized difference between the current and previous month's index values for the specified forecast year and initialization month.
+    """
+    # Calculate the index
     if index_name == "n34":
         index = calc_index(get_subset(data, index_name))
         # Calculate the climatology (mean) and standard deviation during the reference period
         climatology = index.sel(year=slice(*period_clm)).mean(dim='year')
         climatology_std = index.sel(year=slice(*period_clm)).std(dim='year', ddof=1)
-
         # Standardize the entire index data
         index = (index - climatology) / climatology_std
     elif index_name == "dmi":
@@ -279,7 +328,6 @@ def standardize_index_diff1(data, index_name, period_clm, year_fcst, month_init)
         climatology_std_1 = index_1.sel(year=slice(*period_clm)).std(dim='year', ddof=1)
         climatology_2 = index_2.sel(year=slice(*period_clm)).mean(dim='year')
         climatology_std_2 = index_2.sel(year=slice(*period_clm)).std(dim='year', ddof=1)
-
         # Standardize the entire index data
         index_1 = (index_1 - climatology_1) / climatology_std_1
         index_2 = (index_2 - climatology_2) / climatology_std_2
@@ -288,7 +336,7 @@ def standardize_index_diff1(data, index_name, period_clm, year_fcst, month_init)
     else:
         raise TypeError(f"Diff1 not implemented for index {index_name}")
 
-    # Calculate the difference
+    # Calculate the difference between the current and previous month
     if month_init == 1:
         current = index.sel(year=year_fcst-1, month=12)
         previous = index.sel(year=year_fcst-1, month=11)
@@ -320,6 +368,115 @@ def standardize_index_diff1(data, index_name, period_clm, year_fcst, month_init)
     
     return standardized_anomalies
 """
+
+
+def prepare_time_series_data(data, index_name, period_clm, period_train, months, diff1=False):
+    """
+    Prepares the time series data for a given index over a specified training period.
+
+    Args:
+    data (xarray.Dataset): The dataset containing the data to be used for index calculation.
+    index_name (str): The name of the index to be calculated.
+    period_clm (tuple): A tuple containing the start and end years (inclusive) for the reference period.
+    period_train (tuple): A tuple containing the start and end years (inclusive) for the training period.
+    months (list): A list of months to calculate the index for.
+    diff1 (bool, optional): Flag indicating whether to calculate the first difference of the index. Default is False.
+
+    Returns:
+    pd.DataFrame: A DataFrame containing the year, month, and standardized anomaly for the specified index.
+    """
+    time_series_data = []
+
+    for year in range(period_train[0], period_train[1] + 1):
+        for month in months:
+            # Correct for functions calculating value for month-1
+            if month == 12:
+                year_corrected = year + 1
+                month_corrected = 1
+            else:
+                year_corrected = year
+                month_corrected = month + 1
+
+            if diff1:
+                # Deal with first two datapoints not available by copying the first available one
+                if year == period_train[0] and month == 1:
+                    month_corrected += 1
+                
+                standardized_anomaly = standardize_index_diff1(data, index_name, period_clm, year_corrected, month_corrected)
+            else:
+                standardized_anomaly = standardize_index(data, index_name, period_clm, year_corrected, month_corrected)
+                
+            if index_name in ["ueq850", "ueq200", "sji850", "sji200"]:
+                standardized_anomaly = standardized_anomaly.uwind.values
+            else:
+                standardized_anomaly = standardized_anomaly.sst.values
+
+            time_series_data.append({
+                'year': year,
+                'month': month,
+                'standardized_anomaly': standardized_anomaly
+            })
+
+    df = pd.DataFrame(time_series_data)
+
+    # Ensure the 'year' and 'month' columns are integers
+    df['year'] = df['year'].astype(int)
+    df['month'] = df['month'].astype(int)
+    
+    # Ensure the DataFrame has the correct format with 'year', 'month', and 'standardized_anomaly' as columns
+    df = df[['year', 'month', 'standardized_anomaly']]
+    
+    return df
+
+
+def get_all_indices(sst_data, uwind200_data, uwind850_data, period_clm, period_train, months):
+    """
+    Calculates multiple indices and prepares their time series data for a specified training period.
+
+    Args:
+    sst_data (xarray.Dataset): The dataset containing sea surface temperature (SST) data.
+    uwind200_data (xarray.Dataset): The dataset containing 200 hPa zonal wind data.
+    uwind850_data (xarray.Dataset): The dataset containing 850 hPa zonal wind data.
+    period_clm (tuple): A tuple containing the start and end years (inclusive) for the reference period.
+    period_train (tuple): A tuple containing the start and end years (inclusive) for the training period.
+    months (list): A list of months to calculate the indices for.
+
+    Returns:
+    pd.DataFrame: A DataFrame containing the year, month, and standardized anomalies for all specified indices.
+    """
+    index_names = ['n34', 'n3', 'n4', 'dmi', 'n34_diff1', 'dmi_diff1', 'wsp', 'wpg', 'wp', 'wnp', 'ueq850', 'ueq200', 'sji850', 'sji200']
+    index_dfs = {}
+
+    for index in index_names:
+        if index.endswith("diff1"):
+            time_series_df = prepare_time_series_data(sst_data, index[:3], period_clm, period_train, months, diff1=True)
+        elif index in ['ueq850', 'sji850']:
+            time_series_df = prepare_time_series_data(uwind850_data, index, period_clm, period_train, months)
+        elif index in ['ueq200', 'sji200']:
+            time_series_df = prepare_time_series_data(uwind200_data, index, period_clm, period_train, months)
+        else:
+            time_series_df = prepare_time_series_data(sst_data, index, period_clm, period_train, months)
+        
+        index_dfs[index] = time_series_df
+
+    # Add wvg as well
+    # Merge DataFrames
+    merge_for_wvg_df = reduce(lambda left, right: pd.merge(left, right, on=['year', 'month']), (
+        index_dfs["n4"].rename(columns={'standardized_anomaly': 'n4'}),
+        index_dfs["wp"].rename(columns={'standardized_anomaly': 'wp'}),
+        index_dfs["wnp"].rename(columns={'standardized_anomaly': 'wnp'}),
+        index_dfs["wsp"].rename(columns={'standardized_anomaly': 'wsp'}))
+    )
+    merge_for_wvg_df['wvg'] = merge_for_wvg_df['n4'] - (merge_for_wvg_df['wp'] + merge_for_wvg_df['wnp'] + merge_for_wvg_df['wsp']) / 3
+    index_dfs["wvg"] = merge_for_wvg_df[['year', 'month', 'wvg']].rename(columns={'wvg': 'standardized_anomaly'})
+
+    # Combine all DataFrames into a single DataFrame
+    era5_indices = reduce(lambda left, right: pd.merge(left, right, on=['year', 'month']), 
+                          [df.rename(columns={'standardized_anomaly': index}) for index, df in index_dfs.items()])
+    
+    return era5_indices
+
+
 
 
 
