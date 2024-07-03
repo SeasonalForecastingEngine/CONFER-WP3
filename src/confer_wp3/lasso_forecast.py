@@ -7,8 +7,9 @@ import xarray as xr
 
 from eofs.standard import Eof
 from functools import reduce
-from scipy.stats  import norm
+from scipy.stats  import norm, pearsonr
 from scipy.interpolate import interp1d
+from sklearn.linear_model import MultiTaskLassoCV
 
 
 def calculate_anomalies(prec_data, year, period_clm):
@@ -477,6 +478,60 @@ def get_all_indices(sst_data, uwind200_data, uwind850_data, period_clm, period_t
     return era5_indices
 
 
+def compute_ml_results(era5_indices, feature_names, pcs, var_fracs, n_eofs, period_train, period_clm, month_init):
+    # Cross-validation setup
+    years_cv = list(range(period_train[0], period_train[1]+1))
+    years_verif = list(range(period_clm[0], period_clm[1]+1))
+    df_year = pd.DataFrame((np.array(years_cv) - 2000) / 10, index=years_cv, columns=['year'])
+    
+    # Fit models and make predictions
+    previous_month = month_init - 1 if month_init > 1 else 12
+    # Select the data for the month before month_init
+    df_combined_features = era5_indices[(era5_indices['year'].isin(years_cv)) & (era5_indices['month'] == previous_month)].set_index('year')[feature_names]
+    # Ensure there are no missing values
+    df_combined_features.fillna(0, inplace=True)
+    df_target = pd.DataFrame(pcs[:, :n_eofs], index=years_cv).reindex(years_cv)
+    y = df_target.to_numpy()
+    X = df_combined_features.to_numpy()
+
+    # Feature pre-selection
+    # Calculate weights
+    wgt = np.sqrt(var_fracs / np.sum(var_fracs))
+    feature_idx = [True] + [False] * len(df_combined_features.columns)
+    for ift in range(len(feature_idx) - 1):
+        pval = [pearsonr(y[:, ipc], X[:, ift])[1] for ipc in range(n_eofs)]
+        feature_idx[1 + ift] = np.any(np.array(pval) < 0.1 * wgt)#.iloc[0, :])
+
+    df_combined_features = df_combined_features.iloc[:, feature_idx[1:]]
+    df_year = pd.DataFrame((df_combined_features.index - 2000) / 10, index=df_combined_features.index, columns=['year'])
+    df_combined_features = pd.concat([df_year, df_combined_features], axis=1)
+
+    X = df_combined_features.to_numpy()
+
+    # Cross-validation folds
+    k = 5
+    cv_folds = []
+    for i in range(k):
+        idx_test = set(range(i*2, len(years_cv), k*2)).union(set(range(1+i*2, len(years_cv), k*2)))
+        idx_train = set(range(len(years_cv))) - idx_test
+        cv_folds.append((list(idx_train), list(idx_test)))
+    
+    # Lasso regression
+    clf = MultiTaskLassoCV(cv=cv_folds, fit_intercept=False, max_iter=5000)
+    clf.fit(X, y)
+
+    # Make coefficient DataFrame
+    df_coefficients = pd.DataFrame(clf.coef_, index=[f'eof{i}' for i in range(1,n_eofs+1)], columns=df_combined_features.columns)
+
+    # Compute prediction covariance
+    df_fl_pred_cov = pd.DataFrame(index=years_verif, columns=[f'cov-{i}{j}' for i in range(1, n_eofs+1) for j in range(1, n_eofs+1)])  # DataFrame for storing results
+    errors = y - clf.predict(X)
+    ind_active = np.all(clf.coef_ != 0, axis=0)
+    n_a = sum(ind_active)
+    dgf = 1 + n_a if n_a > 0 else 1
+    prediction_cov = np.dot(errors.T, errors) / (len(years_cv) - dgf)
+    df_fl_pred_cov.iloc[:, :] = np.broadcast_to(prediction_cov.flatten(), (len(years_verif), n_eofs ** 2))
+    return df_coefficients, df_fl_pred_cov
 
 
 

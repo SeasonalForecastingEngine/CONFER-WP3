@@ -9,7 +9,7 @@ import pandas as pd
 from scipy.stats import norm
 
 
-def validate_anomalies1(prec_data, anomalies, lat, lon, year_index = 0):
+def validate_anomalies1(prec_data, anomalies, lat, lon, year_index=0):
     """
     Visualize the original precipitation data and calculated anomalies on a map for a single year.
 
@@ -24,18 +24,25 @@ def validate_anomalies1(prec_data, anomalies, lat, lon, year_index = 0):
     None: This function displays two plots - one for the original precipitation data and one for the anomalies.
     """
     print("Visualize the original precipitation data and calculated anomalies on a map for a single year.")
+    
+    # Create the meshgrid for lat and lon
+    lon_grid, lat_grid = np.meshgrid(lon, lat)
+
     # Plot original precipitation data
     plt.figure(figsize=(8, 10))  # Adjusting figsize for a more even aspect ratio
     plt.subplot(2, 1, 1)
     plt.title('Original Precipitation Data')
-    plt.imshow(prec_data[year_index, :, :], origin='lower', extent=[lon.min(), lon.max(), lat.min(), lat.max()], cmap='viridis', aspect='auto')
+    plt.pcolormesh(lon_grid, lat_grid, prec_data[year_index, :, :], cmap='viridis', shading='auto')
     plt.colorbar(label='Precipitation (mm)')
+    plt.gca().set_aspect('equal', adjustable='box')
 
     # Plot anomalies
     plt.subplot(2, 1, 2)
     plt.title('Precipitation Anomalies')
-    plt.imshow(anomalies[year_index, :, :], origin='lower', extent=[lon.min(), lon.max(), lat.min(), lat.max()], cmap='bwr', aspect='auto')
+    plt.pcolormesh(lon_grid, lat_grid, anomalies[year_index, :, :], cmap='bwr', shading='auto')
     plt.colorbar(label='Anomalies (mm)')
+    plt.gca().set_aspect('equal', adjustable='box')
+
     plt.tight_layout()
     plt.show()
 
