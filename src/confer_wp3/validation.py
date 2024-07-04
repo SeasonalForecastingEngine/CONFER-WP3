@@ -3,8 +3,10 @@ This file contains code for validating the calculations made in lasso_fcst_examp
 The code is not needed to run the forecast.
 """
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors 
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 from scipy.stats import norm
 
@@ -350,4 +352,115 @@ def validate_indices(era5_indices, filepath_indices, period_train, year_fcst):
             print(f'Calculated value: {calculated_value}')
             print(f'Reference value: {reference_value}')
             print("\n")
+
+
+def validate_ml_coefficients(df_coefficients, period_train, season, month_init):
+    """
+    Validate and visualize the machine learning model coefficients.
+
+    This function generates a heatmap to visualize the coefficients of a machine learning model
+    for a specified training period, season, and initialization month.
+
+    Parameters:
+    - df_coefficients (pd.DataFrame): DataFrame containing the model coefficients.
+                                      The rows represent EOFs, and the columns represent features.
+    - period_train (tuple): Tuple containing the start and end years of the training period (e.g., (1981, 2020)).
+    - season (str): The season for which the model coefficients are being visualized. 
+                    Expected values: 'MAM', 'JJAS', 'OND'.
+    - month_init (int): The initialization month for the model predictions. Expected values: 1 to 12.
+
+    Returns:
+    - None: The function displays a heatmap of the model coefficients.
+    """
+    # Define month string dictionary
+    month_str = {
+        1: "January", 2: "February", 3: "March", 4: "April",
+        5: "May", 6: "June", 7: "July", 8: "August",
+        9: "September", 10: "October", 11: "November", 12: "December"
+    }[month_init]
+
+    # Create the plot
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Plot the coefficients
+    img = ax.imshow(df_coefficients, vmin={'MAM': -80., 'JJAS': -160., 'OND': -230.}[season],
+                    vmax={'MAM': 80., 'JJAS': 160., 'OND': 230.}[season], cmap='bwr',
+                    extent=[0, len(df_coefficients.columns), 0, len(df_coefficients.index)])
+
+    ax.set_xticks(np.arange(0.5, len(df_coefficients.columns)))
+    ax.set_xticklabels(df_coefficients.columns.to_list(), rotation=90, fontsize=10)
+    ax.set_yticks(np.arange(len(df_coefficients.index) - 0.5, 0, -1))
+    ax.set_yticklabels(df_coefficients.index.to_list(), fontsize=10)
+    ax.set_title(f'CHIRPS, training period: {period_train[0]}-{period_train[1]}', fontsize=16)
+
+    # Adjust layout and add colorbar
+    fig.subplots_adjust(right=0.85)
+    cbar_ax = fig.add_axes([0.9, 0.15, 0.03, 0.7])
+    fig.colorbar(img, cax=cbar_ax)
+
+    # Display the plot
+    plt.show()
+
+
+def validate_forecast(prob_bn, prob_an, prec_data, period_clm, period_train, year, lat, lon, season, year_fcst):
+    """
+    Validate the precipitation forecast against actual data by comparing predicted categories with actual categories.
+
+    Parameters:
+    - prob_bn (numpy.ndarray): Array of probabilities for below-normal precipitation.
+    - prob_an (numpy.ndarray): Array of probabilities for above-normal precipitation.
+    - prec_data (numpy.ndarray): 3D array of precipitation data with dimensions (time, lat, lon).
+    - ref_period_indices (list): List of indices corresponding to the reference period for calculating percentiles.
+    - period_train (tuple): Tuple containing the start and end years of the training period (e.g., (1981, 2020)).
+    - period_clm (tuple): Tuple containing the start and end years of the reference period (e.g., (1993, 2020)).
+    - year (numpy.ndarray): A 1D numpy array of years corresponding to the time dimension of `anomalies_normal`.
+    - lat (numpy.ndarray): 1D array of latitude values.
+    - lon (numpy.ndarray): 1D array of longitude values.
+    - season (str): The season for which the forecast is being validated (e.g., 'MAM', 'JJAS', 'OND').
+    - year_fcst (int): The year for which the forecast is being validated.
+
+    Returns:
+    - None: This function displays a plot showing the validation of the forecast.
+    """
+    # Get reference period indices
+    ref_period_mask = (year >= period_clm[0]) & (year <= period_clm[1])
+    ref_period_indices = np.where(ref_period_mask)[0]
+
+    # Calculate the 33rd and 67th percentiles for each grid point for the reference period
+    percentile_33 = np.nanpercentile(prec_data[ref_period_indices, :, :], 33, axis=0)
+    percentile_67 = np.nanpercentile(prec_data[ref_period_indices, :, :], 67, axis=0)
+
+    # Select the specific year
+    actual_precip = prec_data[year_fcst - period_train[0], :, :]
+
+    # Categorize the precipitation and create a categorical array: 0 for below normal, 1 for normal, 2 for above normal
+    actual_categories = xr.where(actual_precip < percentile_33, 0, xr.where(actual_precip > percentile_67, 2, 1))
+
+    # Determine the predicted category based on highest probability and compare with actual categories
+    verification = xr.where(prob_bn > 0.4, 0, xr.where(prob_an > 0.4, 2, 1)) == actual_categories
+
+    # Reintroduce NaNs based on the original prec_data
+    masked_verification = np.ma.masked_where(np.isnan(prec_data[year_fcst - period_train[0], :, :]), verification)
+
+    # Create a custom colormap
+    cmap = mcolors.ListedColormap(['red', 'green', 'gray'])
+    bounds = [0, 0.5, 1.5, 2]
+    norm = mcolors.BoundaryNorm(bounds, cmap.N)
+
+    fig, ax = plt.subplots(figsize=(7, 5), subplot_kw={'projection': None})
+
+    im = ax.imshow(masked_verification, extent=[lon.min(), lon.max(), lat.min(), lat.max()],
+                   origin='lower', cmap=cmap, norm=norm)
+
+    ax.set_title(f'Verification of {season} {year_fcst} Precipitation Forecast')
+    ax.set_xlabel('Longitude')
+    ax.set_ylabel('Latitude')
+
+    # Create a color bar with the correct labels
+    cbar = fig.colorbar(im, ax=ax, orientation='vertical', ticks=[0.25, 1, 1.75])
+    cbar.ax.set_yticklabels(['Incorrect', 'Correct', 'Masked'])
+
+    plt.tight_layout()
+    plt.show()
+
 

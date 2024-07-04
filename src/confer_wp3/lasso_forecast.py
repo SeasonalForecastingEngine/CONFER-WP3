@@ -1,6 +1,7 @@
 """
 This file contains code for technical calculations used in the lasso forecast.
 """
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -478,62 +479,161 @@ def get_all_indices(sst_data, uwind200_data, uwind850_data, period_clm, period_t
     return era5_indices
 
 
-def compute_ml_results(era5_indices, feature_names, pcs, var_fracs, n_eofs, period_train, period_clm, month_init):
+def get_ml_results(era5_indices, feature_names, pcs, var_fracs, n_eofs, period_train, period_clm, month_init):
+    """
+    Fit a multi-task Lasso regression model and compute the prediction covariance.
+
+    Parameters:
+    - era5_indices (pd.DataFrame): DataFrame containing ERA5 indices with columns ['year', 'month'] and other features.
+    - feature_names (list): List of feature names to be used in the regression model.
+    - pcs (numpy.ndarray): Principal components as a 2D array with dimensions (years, n_eofs).
+    - var_fracs (numpy.ndarray): Array containing the variance fractions explained by each EOF.
+    - n_eofs (int): Number of EOFs to use.
+    - period_train (tuple): Tuple (start_year, end_year) defining the training period.
+    - period_clm (tuple): Tuple (start_year, end_year) defining the climatology period.
+    - month_init (int): The initial month for the model predictions.
+
+    Returns:
+    - df_coefficients (pd.DataFrame): DataFrame containing the fitted model coefficients.
+    - df_fl_pred_cov (pd.DataFrame): DataFrame containing the prediction covariance matrix for each verification year.
+    """
     # Cross-validation setup
-    years_cv = list(range(period_train[0], period_train[1]+1))
-    years_verif = list(range(period_clm[0], period_clm[1]+1))
+    years_cv = list(range(period_train[0], period_train[1] + 1))  # Training years
+    years_verif = list(range(period_clm[0], period_clm[1] + 1))   # Verification years
     df_year = pd.DataFrame((np.array(years_cv) - 2000) / 10, index=years_cv, columns=['year'])
-    
-    # Fit models and make predictions
-    previous_month = month_init - 1 if month_init > 1 else 12
+
     # Select the data for the month before month_init
+    previous_month = month_init - 1 if month_init > 1 else 12
     df_combined_features = era5_indices[(era5_indices['year'].isin(years_cv)) & (era5_indices['month'] == previous_month)].set_index('year')[feature_names]
+    
     # Ensure there are no missing values
     df_combined_features.fillna(0, inplace=True)
+    
+    # Create target DataFrame for the principal components (PCs)
     df_target = pd.DataFrame(pcs[:, :n_eofs], index=years_cv).reindex(years_cv)
     y = df_target.to_numpy()
     X = df_combined_features.to_numpy()
 
     # Feature pre-selection
-    # Calculate weights
-    wgt = np.sqrt(var_fracs / np.sum(var_fracs))
+    wgt = np.sqrt(var_fracs / np.sum(var_fracs))  # Calculate weights
     feature_idx = [True] + [False] * len(df_combined_features.columns)
+    
     for ift in range(len(feature_idx) - 1):
         pval = [pearsonr(y[:, ipc], X[:, ift])[1] for ipc in range(n_eofs)]
-        feature_idx[1 + ift] = np.any(np.array(pval) < 0.1 * wgt)#.iloc[0, :])
+        feature_idx[1 + ift] = np.any(np.array(pval) < 0.1 * wgt)
 
+    # Filter the selected features
     df_combined_features = df_combined_features.iloc[:, feature_idx[1:]]
     df_year = pd.DataFrame((df_combined_features.index - 2000) / 10, index=df_combined_features.index, columns=['year'])
     df_combined_features = pd.concat([df_year, df_combined_features], axis=1)
-
+    
     X = df_combined_features.to_numpy()
 
     # Cross-validation folds
     k = 5
     cv_folds = []
     for i in range(k):
-        idx_test = set(range(i*2, len(years_cv), k*2)).union(set(range(1+i*2, len(years_cv), k*2)))
+        idx_test = set(range(i * 2, len(years_cv), k * 2)).union(set(range(1 + i * 2, len(years_cv), k * 2)))
         idx_train = set(range(len(years_cv))) - idx_test
         cv_folds.append((list(idx_train), list(idx_test)))
-    
+
     # Lasso regression
     clf = MultiTaskLassoCV(cv=cv_folds, fit_intercept=False, max_iter=5000)
     clf.fit(X, y)
 
     # Make coefficient DataFrame
-    df_coefficients = pd.DataFrame(clf.coef_, index=[f'eof{i}' for i in range(1,n_eofs+1)], columns=df_combined_features.columns)
+    df_coefficients = pd.DataFrame(clf.coef_, index=[f'eof{i}' for i in range(1, n_eofs + 1)], columns=df_combined_features.columns)
 
     # Compute prediction covariance
-    df_fl_pred_cov = pd.DataFrame(index=years_verif, columns=[f'cov-{i}{j}' for i in range(1, n_eofs+1) for j in range(1, n_eofs+1)])  # DataFrame for storing results
+    df_fl_pred_cov = pd.DataFrame(index=years_verif, columns=[f'cov-{i}{j}' for i in range(1, n_eofs + 1) for j in range(1, n_eofs + 1)])  # DataFrame for storing results
     errors = y - clf.predict(X)
     ind_active = np.all(clf.coef_ != 0, axis=0)
     n_a = sum(ind_active)
     dgf = 1 + n_a if n_a > 0 else 1
     prediction_cov = np.dot(errors.T, errors) / (len(years_cv) - dgf)
     df_fl_pred_cov.iloc[:, :] = np.broadcast_to(prediction_cov.flatten(), (len(years_verif), n_eofs ** 2))
+    
     return df_coefficients, df_fl_pred_cov
 
 
+def calculate_tercile_probability_forecasts(era5_indices, anomalies_normal, eofs_reshaped, df_coefficients, df_fl_pred_cov, var_fracs, feature_names, year, period_clm, n_eofs, year_fcst, month_init):
+    """
+    Calculate tercile probability forecasts for precipitation amounts using machine learning model coefficients and EOFs.
+
+    This function calculates the below-normal (prob_bn) and above-normal (prob_an) tercile probabilities
+    for precipitation amounts based on machine learning model predictions.
+
+    Parameters:
+    - era5_indices (pd.DataFrame): DataFrame containing ERA5 indices with columns ['year', 'month'] and other features.
+    - anomalies_normal (numpy.ndarray): 3D array of normalized anomalies with dimensions (time, lat, lon).
+    - eofs_reshaped (numpy.ndarray): 3D array of EOFs reshaped with dimensions (n_eofs, lat, lon).
+    - df_coefficients (pd.DataFrame): DataFrame containing the model coefficients.
+    - df_fl_pred_cov (pd.DataFrame): DataFrame containing the prediction covariance matrix for each year.
+    - var_fracs (numpy.ndarray): Array containing the variance fractions explained by each EOF.
+    - feature_names (list): List of feature names to be used in the regression model.
+    - year (numpy.ndarray): 1D array of years corresponding to the anomalies_normal and era5_indices data.
+    - period_clm (tuple): Tuple containing the start and end years of the climatology period (e.g., (1993, 2020)).
+    - n_eofs (int): Number of EOFs to use.
+    - year_fcst (int): The forecast year for which the probabilities are being calculated.
+    - month_init (int): The initialization month for the model predictions.
+
+    Returns:
+    - prob_bn (numpy.ndarray): 2D array of probabilities for below-normal precipitation.
+    - prob_an (numpy.ndarray): 2D array of probabilities for above-normal precipitation.
+    """
+    
+    # Select the reference period using a boolean mask
+    ref_period_mask = (year >= period_clm[0]) & (year <= period_clm[1])
+    ref_period_indices = np.where(ref_period_mask)[0]
+    
+    # Define the previous month
+    previous_month = month_init - 1 if month_init > 1 else 12
+    years_verif = list(range(period_clm[0], period_clm[1] + 1))
+
+    # Reshape the covariance matrix for each year
+    df_fl_pred_cov_reshaped = np.array([df_fl_pred_cov.loc[year].values.reshape(n_eofs, n_eofs) for year in df_fl_pred_cov.index])
+
+    # Use the reshaped covariance matrix for the forecast year
+    cov_matrix_for_year = df_fl_pred_cov_reshaped[years_verif.index(year_fcst)]
+
+    # Calculate the standard deviation of anomalies for the reference period
+    scaling = np.nanstd(anomalies_normal[ref_period_indices, :, :], axis=0, ddof=1)
+
+    # Select the data for the forecast year and previous month
+    year_month_mask = (era5_indices['year'] == year_fcst) & (era5_indices['month'] == previous_month)
+    ts_indices = era5_indices.loc[year_month_mask, feature_names].iloc[0]
+
+    # Ensure alignment before using the function
+    coefficients_columns = df_coefficients.columns.to_list()
+    ts_indices = ts_indices.reindex(coefficients_columns)
+    
+    # Calculate residual variance
+    var_eps = scaling**2 - np.sum(var_fracs[:, None, None] * eofs_reshaped**2, axis=0)
+
+    # Ensure ts_indices has year standardized
+    ts_indices['year'] = (year_fcst - 2000) / 10
+
+    # Calculate predictive mean of factor loadings
+    fl_eof_mean = df_coefficients.dot(ts_indices).to_numpy()
+
+    # Calculate mean and variance of the probabilistic forecast in normal space
+    mean_ml = np.array(np.sum(fl_eof_mean[:, None, None] * eofs_reshaped, axis=0), dtype=np.float64)
+    var_ml = np.array(np.sum(np.sum(cov_matrix_for_year[:, :, None, None] * eofs_reshaped[None, :, :, :], axis=1) * eofs_reshaped, axis=0) + var_eps, dtype=np.float64)
+
+    # Standardize mean and variance
+    mean_ml_stdz = mean_ml / scaling
+    stdv_ml_stdz = np.sqrt(var_ml) / scaling
+
+    # Calculate tercile forecasts
+    prob_bn = norm.cdf((norm.ppf(0.333) - mean_ml_stdz) / stdv_ml_stdz)
+    prob_an = 1.0 - norm.cdf((norm.ppf(0.667) - mean_ml_stdz) / stdv_ml_stdz)
+
+    return prob_bn, prob_an
+
+
+
+"""
+Deprecated
 
 def calculate_local_stdv(season, period_clm, anomaly_dir):      # Should be calculated when calculating the anomalies and saved out in EOF files 
     period_clm_str = f'{period_clm[0]}-{period_clm[1]}'
@@ -582,7 +682,7 @@ def calculate_tercile_probability_forecasts(season, year_fcst, month_init, perio
     prob_an = 1.-norm.cdf((norm.ppf(0.667)-mean_ml_stdz)/stdv_ml_stdz)
     return prob_bn, prob_an
 
-
+"""
 
 
 

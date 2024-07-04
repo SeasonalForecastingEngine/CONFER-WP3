@@ -11,6 +11,41 @@ from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
+def plot_fields_simple(fields, titles, cmap, unit, lat, lon, season, year):
+    """
+    Plot multiple fields on a single figure with individual colorbars.
+
+    This function generates a side-by-side comparison of different fields (e.g., predicted probabilities for different terciles)
+    on a map, each with its own colorbar. The fields are displayed using the specified colormaps and titles.
+
+    Parameters:
+    - fields (list of numpy.ndarray): List of 2D arrays to be plotted. Each array represents a field (e.g., predicted probabilities).
+    - titles (list of str): List of titles for each subplot.
+    - cmap (list of str or Colormap): List of colormaps to be used for each field.
+    - unit (str): Unit label for the colorbars.
+    - season (str): Season for which the fields are being plotted (e.g., 'MAM', 'JJAS', 'OND').
+    - year (int): Year for which the fields are being plotted.
+
+    Returns:
+    - None: This function displays a plot with multiple subplots, each showing a different field with a colorbar.
+    """
+    n_fields = len(fields)
+    fig, axes = plt.subplots(1, n_fields, figsize=(15, 5), subplot_kw={'projection': None})
+
+    for i, ax in enumerate(axes):
+        im = ax.imshow(fields[i], extent=[lon.min(), lon.max(), lat.min(), lat.max()],
+                       origin='lower', cmap=cmap[i], vmin=0.333, vmax=1)
+        ax.set_title(titles[i])
+        ax.set_xlabel('Longitude')
+        ax.set_ylabel('Latitude')
+        cbar = fig.colorbar(im, ax=ax, orientation='vertical')
+        cbar.set_label(unit)
+
+    fig.suptitle(f'Predicted tercile probabilities for {season} precipitation amounts, {year}', fontsize=16)
+    plt.tight_layout()
+    plt.show()
+
+
 def get_nearest_grid_index(lon_exmpl, lat_exmpl, lon_grid, lat_grid):
     ix = np.argmin(abs(lon_grid-lon_exmpl))
     iy = np.argmin(abs(lat_grid-lat_exmpl))
