@@ -74,7 +74,7 @@ def load_raw_data(dir, predictor, years, season, lat_bnds = None, lon_bnds = Non
         return data
 
 
-def save_anomalies(anomalies, year, lat, lon, dir, normalized=False):
+def save_anomalies(anomalies, year, lat, lon, dir, season, normalized=False):
     """
     Save the calculated anomalies to a NetCDF file.
 
@@ -84,6 +84,7 @@ def save_anomalies(anomalies, year, lat, lon, dir, normalized=False):
     - lat (numpy.ndarray): A 1D numpy array of latitudes corresponding to the second dimension of `anomalies`.
     - lon (numpy.ndarray): A 1D numpy array of longitudes corresponding to the third dimension of `anomalies`.
     - dir (str): The directory path where the NetCDF file will be saved.
+    - season (str): The season to save anomalies for ('MAM', 'JJAS' or 'OND').
     - normalized (bool, optional): A flag indicating whether the anomalies are normalized. Default is False.
 
     Returns:
@@ -95,15 +96,15 @@ def save_anomalies(anomalies, year, lat, lon, dir, normalized=False):
     # Save the anomalies
     if normalized:
         print("Saving normalized anomalies...")
-        anomalies_xr.to_netcdf(f"{dir}chirps_anomalies_normal.nc")
-        print(f"Normalized anomalies saved to: {dir}chirps_anomalies_normal.nc")
+        anomalies_xr.to_netcdf(f"{dir}chirps_anomalies_normal_{season}.nc")
+        print(f"Normalized anomalies saved to: {dir}chirps_anomalies_{season}_normal.nc")
     else:
         print("Saving anomalies...")
-        anomalies_xr.to_netcdf(f"{dir}chirps_anomalies.nc")
-        print(f"Anomalies saved to: {dir}chirps_anomalies.nc")
+        anomalies_xr.to_netcdf(f"{dir}chirps_anomalies_{season}.nc")
+        print(f"Anomalies saved to: {dir}chirps_anomalies_{season}.nc")
 
 
-def save_eofs_pcs(eofs_reshaped, pcs, var_fractions, year, lat, lon, dir):
+def save_eofs_pcs(eofs_reshaped, pcs, var_fractions, year, lat, lon, dir, season):
     """
     Save the calculated EOFs, PCs, and variance fractions to NetCDF files.
 
@@ -115,6 +116,7 @@ def save_eofs_pcs(eofs_reshaped, pcs, var_fractions, year, lat, lon, dir):
     - lat (numpy.ndarray): A 1D numpy array of latitudes corresponding to the spatial dimensions of `eofs`.
     - lon (numpy.ndarray): A 1D numpy array of longitudes corresponding to the spatial dimensions of `eofs`.
     - dir (str): The directory path where the NetCDF files will be saved.
+    - season (str): The season to save anomalies for ('MAM', 'JJAS' or 'OND').
 
     Returns:
     - None: The function saves the EOFs, PCs, and variance fractions to NetCDF files in the specified directory.
@@ -126,25 +128,25 @@ def save_eofs_pcs(eofs_reshaped, pcs, var_fractions, year, lat, lon, dir):
     var_fractions_xr = xr.DataArray(var_fractions, coords=[range(var_fractions.shape[0])], dims=['eof'])
 
     # Save the EOFs
-    eofs_file_path = f"{dir}chirps_eofs.nc"
+    eofs_file_path = f"{dir}chirps_eofs_{season}.nc"
     print(f"Saving EOFs...")
     eofs_xr.to_netcdf(eofs_file_path)
     print(f"EOFs saved to: {eofs_file_path}")
 
     # Save the PCs
-    pcs_file_path = f"{dir}chirps_pcs.nc"
+    pcs_file_path = f"{dir}chirps_pcs_{season}.nc"
     print(f"Saving PCs...")
     pcs_xr.to_netcdf(pcs_file_path)
     print(f"PCs saved to: {pcs_file_path}")
 
     # Save the variance fractions
-    var_fractions_file_path = f"{dir}chirps_var_fracs.nc"
+    var_fractions_file_path = f"{dir}chirps_var_fracs_{season}.nc"
     print(f"Saving variance fractions...")
     var_fractions_xr.to_netcdf(var_fractions_file_path)
     print(f"Variance fractions saved to: {var_fractions_file_path}")
 
 
-def save_model_results(df_coefficients, df_fl_pred_cov, dir, n_eofs=7):
+def save_model_results(df_coefficients, df_fl_pred_cov, dir, season, n_eofs=7):
     """
     Save the model coefficients and prediction covariances to NetCDF files.
 
@@ -152,6 +154,7 @@ def save_model_results(df_coefficients, df_fl_pred_cov, dir, n_eofs=7):
     - df_coefficients (pd.DataFrame): A DataFrame containing the model coefficients.
     - df_fl_pred_cov (pd.DataFrame): A DataFrame containing the prediction covariances.
     - dir (str): The directory path where the NetCDF files will be saved.
+    - season (str): The season to save anomalies for ('MAM', 'JJAS' or 'OND').
     - n_eofs (int): Number of EOFs (default is 7).
 
     Returns:
@@ -162,7 +165,7 @@ def save_model_results(df_coefficients, df_fl_pred_cov, dir, n_eofs=7):
     coefficients_xr = xr.Dataset.from_dataframe(df_coefficients)
 
     # Save the coefficients
-    coefficients_file_path = f"{dir}model_coefficients.nc"
+    coefficients_file_path = f"{dir}model_coefficients_{season}.nc"
     print(f"Saving model coefficients...")
     coefficients_xr.to_netcdf(coefficients_file_path)
     print(f"Model coefficients saved to: {coefficients_file_path}")
@@ -178,7 +181,7 @@ def save_model_results(df_coefficients, df_fl_pred_cov, dir, n_eofs=7):
     )
 
     # Save the prediction covariances
-    covariances_file_path = f"{dir}prediction_covariances.nc"
+    covariances_file_path = f"{dir}prediction_covariances_{season}.nc"
     print(f"Saving prediction covariances...")
     cov_ds.to_netcdf(covariances_file_path)
     print(f"Prediction covariances saved to: {covariances_file_path}")

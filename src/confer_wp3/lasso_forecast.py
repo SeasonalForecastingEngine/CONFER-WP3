@@ -1,7 +1,6 @@
 """
 This file contains code for technical calculations used in the lasso forecast.
 """
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xarray as xr

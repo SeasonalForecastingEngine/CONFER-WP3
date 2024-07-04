@@ -46,6 +46,7 @@ def plot_fields_simple(fields, titles, cmap, unit, lat, lon, season, year):
     plt.show()
 
 
+
 def get_nearest_grid_index(lon_exmpl, lat_exmpl, lon_grid, lat_grid):
     ix = np.argmin(abs(lon_grid-lon_exmpl))
     iy = np.argmin(abs(lat_grid-lat_exmpl))

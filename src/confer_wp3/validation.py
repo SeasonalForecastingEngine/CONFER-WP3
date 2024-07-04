@@ -2,9 +2,9 @@
 This file contains code for validating the calculations made in lasso_fcst_example. 
 The code is not needed to run the forecast.
 """
-import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors 
 import numpy as np
+import matplotlib.pyplot as plt
 import pandas as pd
 import xarray as xr
 
