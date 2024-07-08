@@ -25,7 +25,6 @@ def validate_anomalies1(prec_data, anomalies, lat, lon, year_index=0):
     Returns:
     None: This function displays two plots - one for the original precipitation data and one for the anomalies.
     """
-    print("Visualize the original precipitation data and calculated anomalies on a map for a single year.")
     
     # Create the meshgrid for lat and lon
     lon_grid, lat_grid = np.meshgrid(lon, lat)
@@ -63,7 +62,7 @@ def validate_anomalies2(anomalies, anomalies_normal, lat, lon, year_index=0):
     Returns:
     - None: The function generates two side-by-side plots comparing the original and transformed precipitation anomalies for the specified year.
     """
-    print("Visualize and compare original and transformed precipitation anomalies for a single year.")
+
     fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(20, 6))
 
     # Plot Precipitation Anomalies
@@ -101,7 +100,7 @@ def validate_anomalies3(anomalies, anomalies_normal):
     Returns:
     - None: The function generates two histograms side-by-side comparing the distributions of original and transformed precipitation anomalies.
     """
-    print("Visualize and compare the distribution of original and transformed precipitation anomalies using histograms.")
+    
     # Flatten the arrays for plotting histograms
     anomalies_flat = anomalies.flatten()
     anomalies_normal_flat = anomalies_normal.flatten()

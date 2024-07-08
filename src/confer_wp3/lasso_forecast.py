@@ -590,7 +590,7 @@ def calculate_tercile_probability_forecasts(era5_indices, anomalies_normal, eofs
     years_verif = list(range(period_clm[0], period_clm[1] + 1))
 
     # Reshape the covariance matrix for each year
-    df_fl_pred_cov_reshaped = np.array([df_fl_pred_cov.loc[year].values.reshape(n_eofs, n_eofs) for year in df_fl_pred_cov.index])
+    df_fl_pred_cov_reshaped = np.array([df_fl_pred_cov.loc[yr].values.reshape(n_eofs, n_eofs) for yr in df_fl_pred_cov.index])
 
     # Use the reshaped covariance matrix for the forecast year
     cov_matrix_for_year = df_fl_pred_cov_reshaped[years_verif.index(year_fcst)]
