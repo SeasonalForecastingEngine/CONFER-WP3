@@ -64,6 +64,12 @@ ERA5 reanalysis data can be downloaded from the [Climate Data Store (CDS)](https
 ### Seasonal forecasts of daily precipitation amounts
 
 Seasonal forecasts of daily precipitation amounts by various forecast centers can also be downloaded from the [Climate Data Store (CDS)](https://cds.climate.copernicus.eu/#!/home). Our code for reading the forecasts assumes one of the following filename and format conventions:
-* If the name of the folder in which the forecasts are stored ends in '_nc', all filenames are assumed to have the form 'total_precipitation\_<forecast system\>\_<forcast year\>\_<initialization month\>.nc' where forecast system is a string (e.g. 'ecmwf'), forecast year is an integer (e.g. 2023), and forecast initialization month is an integer (e.g. '5' for initialisation in May).
-* If the name of the folder in which the forecasts are stored ends in '_grib`', all filenames are assumed to have the form '<forecast system\>\_<initialization month\>\_<forcast year\>.grib' where forecast system is a string (e.g. 'ecmwf'), forecast year is an integer (e.g. 2023), and forecast initialization month is a 3-character string (e.g. 'may').
+* If the name of the folder in which the forecasts are stored ends in '_nc', all filenames are assumed to have the form 'total_precipitation\_<forecast system\>\_<forcast year\>\_<initialization month\>.nc' where
+  * <forecast system\> is a string (e.g. 'ecmwf'),
+  * <forecast year\> is an integer (e.g. 2023),
+  * <forecast initialization month\> is an integer (e.g. '5' for initialisation in May).
+* If the name of the folder in which the forecasts are stored ends in '_grib`', all filenames are assumed to have the form '<forecast system\>\_<initialization month\>\_<forcast year\>.grib' where
+  * <forecast system\> is a string (e.g. 'ecmwf'),
+  * <forecast year\> is an integer (e.g. 2023),
+  * <forecast initialization month\> is a 3-character string (e.g. 'may').
 
