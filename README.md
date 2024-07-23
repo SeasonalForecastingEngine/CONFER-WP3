@@ -5,21 +5,10 @@ An **R-package for forecast evaluation** was also developed in this work package
 
 
 
-
 ## Installation
 
-To install the package ...
-
-1. Change the name of the directory "package_name" inside the "src"-folder to the name of the package you are developing.
-2. In the "pyproject.toml"-file, the following changes must made:
-
-    a) The information about the package, such as the name of the package, its author(s), the version of the package and so forth must be specified in the top of the file beneath the `[poetry.tool]`-header.
-
-    b) Dependencies of the package are included below the `[tool.poetry.dependencies]` header. Here, you can also specify which Python versions the package is compatible with. This can also be left empty, and our package manager `poetry` will update it when new packages are added, more on this later.
-
-    c) *Optional*. When developing and using the package, it can be useful to provided examples of how the package can be used. This could e.g. entail running unit tests, or plotting some results of the package which would require the use of a library like `matplotlib`. This means that there are packages that are required in development that are not a dependency of the package. Such development dependencies are specified below the header `[tool.poetry.group.dev.dependencies]`, and can again be added using the poetry tool as explained below.
-
-If the above changes have been made, you are ready to install the package and start developing it. In order to do that, we will introduce you to a package manager called "poetry" in the following sections.
+To install the package, run
+* `[pip install git+ssh://git@github.com:SeasonalForecastingEngine/CONFER-WP3.git]`
 
 
 
