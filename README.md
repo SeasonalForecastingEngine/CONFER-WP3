@@ -8,7 +8,7 @@ An **R-package for forecast evaluation** was also developed in this work package
 ## Installation
 
 To install the package, run
-* `[pip install git+ssh://git@github.com:SeasonalForecastingEngine/CONFER-WP3.git]`
+* `pip install git+ssh://git@github.com:SeasonalForecastingEngine/CONFER-WP3.git`
 
 
 
@@ -63,5 +63,7 @@ ERA5 reanalysis data can be downloaded from the [Climate Data Store (CDS)](https
 
 ### Seasonal forecasts of daily precipitation amounts
 
-Seasonal forecasts of daily precipitation amounts by various forecast centers can also be downloaded from the [Climate Data Store (CDS)](https://cds.climate.copernicus.eu/#!/home). It is assumed that these data are converted to the NetCDF format, and that the forecast data folder referred to in the Jupyter notebooks contains all files of the form 'total_precipitation\_<forecast system\>\_<forcast year\>\_<initialization month\>.nc' required by the choices of a forecast system, training period, and forecast initialization month specified in the respective Jupyter notebooks.
+Seasonal forecasts of daily precipitation amounts by various forecast centers can also be downloaded from the [Climate Data Store (CDS)](https://cds.climate.copernicus.eu/#!/home). Our code for reading the forecasts assumes one of the following filename and format conventions:
+* If the name of the folder in which the forecasts are stored ends in '_nc', all filenames are assumed to have the form 'total_precipitation\_<forecast system\>\_<forcast year\>\_<initialization month\>.nc' with the choices of a forecast system, training period, and forecast initialization month specified in the respective Jupyter notebooks.
+* If the name of the folder in which the forecasts are stored ends in '_grib`', all filenames are assumed to have the form '<forecast system\>\_<initialization month\>\_<forcast year\>.grib' with the choices of a forecast system, training period, and forecast initialization month specified in the respective Jupyter notebooks.
 
