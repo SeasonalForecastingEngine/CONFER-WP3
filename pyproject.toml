@@ -25,7 +25,7 @@ packages = [
 # Below this header, the Python version of the project and the dependencies of the package are listed.
 # The fields below can be left blank and poetry will update them for you when a package is added or removed
 # using "poetry add <package>"/"poetry remove <package>".
-python = ">=3.9,<3.13" # Required Python versions
+python = ">=3.8,<3.13" # Required Python versions
 numpy = ">=1.24.2"
 scipy = ">=1.10.1"
 xarray = ">=2023.1.0"

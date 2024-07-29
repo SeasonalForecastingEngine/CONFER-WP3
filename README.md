@@ -64,6 +64,6 @@ ERA5 reanalysis data can be downloaded from the [Climate Data Store (CDS)](https
 ### Seasonal forecasts of daily precipitation amounts
 
 Seasonal forecasts of daily precipitation amounts by various forecast centers can also be downloaded from the [Climate Data Store (CDS)](https://cds.climate.copernicus.eu/#!/home). Our code for reading the forecasts assumes one of the two following filename and format conventions:
-* If the name of the folder in which the forecasts are stored ends in '_nc', all filenames are assumed to have the form 'total_precipitation\_<forecast system\>\_<forcast year\>\_<initialization month\>.nc', e.g. 'total_precipitation_ecmwf_2023_5.nc'.
-* If the name of the folder in which the forecasts are stored ends in '_grib`', all filenames are assumed to have the form '<forecast system\>\_<initialization month\>\_<forcast year\>.grib', e.g. 'ecmwf_may_2023.grib').
+* If the name of the folder in which the forecasts are stored ends in '_nc', all filenames are assumed to have the form 'total_precipitation\_<forecast system\>\_<forcast year\>\_<initialization month\>.nc', e.g. 'total_precipitation_ecmwf_2023_5.nc'. Initialization month is here given as an interger between 1 and 12.
+* If the name of the folder in which the forecasts are stored ends in '_grib`', all filenames are assumed to have the form '<forecast system\>\_<initialization month\>\_<forcast year\>.grib', e.g. 'ecmwf_may_2023.grib'. Initialization month is here given as a 3-character string.
 
