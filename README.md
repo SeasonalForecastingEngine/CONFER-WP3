@@ -7,7 +7,11 @@ An **R-package for forecast evaluation** was also developed in this work package
 
 ## Installation
 
-To install the package, run
+Since the Jupyter notebooks in `notebooks` are the most user-friendly option to drive the underlying functions, it is recommended to
+* clone the repository: `git clone https://github.com/SeasonalForecastingEngine/CONFER-WP3.git`
+and then install the package from the cloned repository using either `poetry` (which takes care of all dependencies) or
+* `pip install .`
+after all dependencies have been installed manually. If just the package is needed (without the notebooks) it can be installed via
 * `pip install confer-wp3@git+https://github.com/SeasonalForecastingEngine/CONFER-WP3.git`
 
 
