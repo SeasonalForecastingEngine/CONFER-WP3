@@ -16,7 +16,7 @@ month_init_dict = {'jan':1 ,'feb':2, 'mar':3, 'apr':4, 'may':5, 'jun':6, 'jul':7
 
 def get_filename(fcst_dir, system, year_fcst, month_init):
     if fcst_dir[-5:-1] == 'grib':
-        return  f'{fcst_dir}{system}_{month_init}_{year_fcst}.grib'
+        return  f'{fcst_dir}{system}/{month_init}/{system}_{month_init}_{year_fcst}.grib'
     elif fcst_dir[-3:-1] == 'nc':
         return f'{fcst_dir}total_precipitation_{system}_{year_fcst}_{month_init_dict[month_init]}.nc'
     else:

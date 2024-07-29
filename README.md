@@ -8,7 +8,7 @@ An **R-package for forecast evaluation** was also developed in this work package
 ## Installation
 
 To install the package, run
-* `pip install git+ssh://git@github.com:SeasonalForecastingEngine/CONFER-WP3.git`
+* `pip install confer-wp3@git+https://github.com/SeasonalForecastingEngine/CONFER-WP3.git`
 
 
 
