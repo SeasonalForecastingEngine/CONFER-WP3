@@ -222,7 +222,7 @@ def validate_pcs_plotter(pcs, title, size=(15, 5)):
     plt.show()
 
 
-def validate_pcs(anomalies_normal, eofs_reshaped, pcs, lat, lon, year, period_train, season, n_eofs=7):
+def validate_pcs(anomalies_normal, eofs_reshaped, pcs, lat, lon, year, period_train, season, n_eofs):
     """
     Validate the principal components (PCs) by comparing calculated PCs with reference time series.
 

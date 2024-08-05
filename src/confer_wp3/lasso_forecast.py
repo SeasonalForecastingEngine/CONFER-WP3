@@ -135,12 +135,13 @@ def compute_eofs_pcs(anomalies_normal, n_eofs):
     pcs = solver.pcs(npcs=n_eofs)
     variance_fraction = solver.varianceFraction(neigs=n_eofs)
 
-    # Code for flipping value of first EOF if it is negative. Ask Michael whether I should then only flip the first, or flip them all.
-    # # Check if the first EOF is predominantly negative
-    # if np.sum(eofs[0] < 0) > np.sum(eofs[0] > 0):
-    #     # If it is, flip the sign of the first EOF and its corresponding PC
-    #     eofs[0] *= -1
-    #     pcs[:, 0] *= -1
+    # Code for flipping value of first EOF if it is negative.
+    # This helps with the interpretability of the plot of model coefficients, as the coefficients for eof1 will correspond in sign to the intuitive interpretation of positive sign signifiying positive association and vice versa.
+    # Check if the first EOF is predominantly negative
+    if np.sum(eofs[0] < 0) > np.sum(eofs[0] > 0):
+        # If it is, flip the sign of the first EOF and its corresponding PC
+        eofs[0] *= -1
+        pcs[:, 0] *= -1
     
     return eofs, pcs, variance_fraction
 
@@ -351,9 +352,10 @@ def standardize_index_diff1(data, index_name, period_clm, year_fcst, month_init)
     difference = current - previous
 
     return difference
-"""
+
     # Code that standardizes one more time after calculating differences.
-    
+    # This is an alternative implementation that could also be sensible, but is not currently used to replicate previously calculated indices.
+"""
     # Calculate climatology and standard deviation of differences
     diff_data = xr.concat([
         ref_data.diff('month').assign_coords(month=range(2, 13)),
@@ -397,18 +399,27 @@ def prepare_time_series_data(data, index_name, period_clm, period_train, months,
             else:
                 year_corrected = year
                 month_corrected = month + 1
+            
+            # Set variable fixing first value
+            first_val = False
 
             if diff1:
-                # Deal with first two datapoints not available by copying the first available one
+                # Deal with the first datapoint not available by setting the anomaly to 0
                 if year == period_train[0] and month == 1:
-                    month_corrected += 1
-                
-                standardized_anomaly = standardize_index_diff1(data, index_name, period_clm, year_corrected, month_corrected)
+                    first_val = True    # Sets to 0 further down in the function
+                else:
+                    standardized_anomaly = standardize_index_diff1(data, index_name, period_clm, year_corrected, month_corrected)
+                # Alternatively, deal with first two datapoints not available by copying the first available one
+                # if year == period_train[0] and month == 1:
+                #     month_corrected += 1
+                #     standardized_anomaly = standardize_index_diff1(data, index_name, period_clm, year_corrected, month_corrected)
             else:
                 standardized_anomaly = standardize_index(data, index_name, period_clm, year_corrected, month_corrected)
                 
             if index_name in ["ueq850", "ueq200", "sji850", "sji200"]:
                 standardized_anomaly = standardized_anomaly.uwind.values
+            elif first_val:
+                standardized_anomaly = 0.
             else:
                 standardized_anomaly = standardized_anomaly.sst.values
 
@@ -559,6 +570,9 @@ def calculate_tercile_probability_forecasts(era5_indices, anomalies_normal, eofs
     """
     Calculate tercile probability forecasts for precipitation amounts using machine learning model coefficients and EOFs.
 
+    The plot of combined tercile probabilities currently never displays values in the normal category. 
+    I am not sure why, but I think this is most likely due to the values of prob_bn and prob_an coming from calculate_tercile_probability_forecasts always being too high to let normal become the largest category.
+
     This function calculates the below-normal (prob_bn) and above-normal (prob_an) tercile probabilities
     for precipitation amounts based on machine learning model predictions.
 
@@ -628,64 +642,3 @@ def calculate_tercile_probability_forecasts(era5_indices, anomalies_normal, eofs
     prob_an = 1.0 - norm.cdf((norm.ppf(0.667) - mean_ml_stdz) / stdv_ml_stdz)
 
     return prob_bn, prob_an
-
-
-
-"""
-Deprecated
-
-def calculate_local_stdv(season, period_clm, anomaly_dir):      # Should be calculated when calculating the anomalies and saved out in EOF files 
-    period_clm_str = f'{period_clm[0]}-{period_clm[1]}'
-    nc = xr.open_dataset(f'{anomaly_dir}refper_{period_clm_str}/precip_full_{season}.nc', engine='netcdf4')
-    nc_subset = nc.sel(year=slice(period_clm[0],period_clm[1]), loy=period_clm[0])
-    #year = nc_subset.year.values
-    #lat = nc_subset.lat.values
-    #lon = nc_subset.lon.values
-    #prcp_tercile_cat = nc_subset.tercile_cat.values   # dimension: (lat, lon, year, loy)
-    prcp_ano = nc_subset.ano_norm.values
-    nc.close()
-    return np.std(prcp_ano, axis=2, ddof=1)
-
-
-
-def calculate_tercile_probability_forecasts(season, year_fcst, month_init, period_train, period_clm, indices_dir, anomaly_dir, eof_dir, fcst_dir):
-    ntg = 7 # global parameter ??
-    period_clm_str = f'{period_clm[0]}-{period_clm[1]}'
-    period_train_str = f'{period_train[0]}-{period_train[1]}'
-    scaling = calculate_local_stdv(season, period_clm, anomaly_dir)
-    # Load (first 7) EOFs and calculate residual variance
-    nc = xr.open_dataset(f'{eof_dir}refper_{period_clm_str}/prec_full_seasonal_{season}.nc')
-    nc_subset = nc.sel(loy=period_clm[0], eof=slice(1,ntg))
-    eofs = np.transpose(nc_subset.u.values, axes=(0,2,1))
-    eigenvalues = (nc_subset.d.values**2) / (period_clm[1]-period_clm[0])
-    nc.close()
-    var_eps = scaling**2 - np.sum(eigenvalues[:,None,None]*eofs**2, axis=0)    # climatological variance minus variance explained by the first 7 EOFs
-    # Load estimated coefficients and covariance matrix of the prediction errors of the factor loadings
-    coefficients = pd.read_csv(f'{fcst_dir}refper_{period_clm_str}_cvper_{period_train_str}/coefficients_indices_lasso_full_im{month_init}_{season}.csv', index_col=0)
-    fl_eof_cov = pd.read_csv(f'{fcst_dir}refper_{period_clm_str}_cvper_{period_train_str}/fls_cov_indices_lasso_full_im{month_init}_{season}.csv', index_col=0).loc[period_clm[1]].to_numpy().reshape(ntg,ntg)
-    # Load indices for forecast year
-    ts_indices = pd.Series(index=coefficients.columns)
-    for index_name in coefficients.columns[1:]:
-        filename_index = f'{indices_dir}refper_{period_clm_str}/indices/{index_name}_full.csv'
-        ts_indices[index_name] = pd.read_csv(filename_index, index_col=['year','month','loy'], usecols=['year','month','loy','fl']).rename(columns={'fl':index_name}).loc[(year_fcst,month_init-1,period_clm[1]),:].iloc[0]
-    ts_indices['year'] = (year_fcst-2000)/10
-    # Calculate predictive mean of factor loadings
-    fl_eof_mean = coefficients.dot(ts_indices).to_numpy()
-    ## Calculate mean and variance of the probabilistic forecast in normal space
-    mean_ml = np.sum(fl_eof_mean[:,None,None]*eofs, axis=0)
-    var_ml = np.sum(np.sum(fl_eof_cov[:,:,None,None]*eofs[None,:,:,:], axis=1)*eofs, axis=0) + var_eps
-    mean_ml_stdz = mean_ml / scaling
-    stdv_ml_stdz = np.sqrt(var_ml) / scaling
-    ## Calculate tercile forecasts
-    prob_bn = norm.cdf((norm.ppf(0.333)-mean_ml_stdz)/stdv_ml_stdz)
-    prob_an = 1.-norm.cdf((norm.ppf(0.667)-mean_ml_stdz)/stdv_ml_stdz)
-    return prob_bn, prob_an
-
-"""
-
-
-
-
-
-
-

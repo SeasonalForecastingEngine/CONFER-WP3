@@ -146,7 +146,7 @@ def save_eofs_pcs(eofs_reshaped, pcs, var_fractions, year, lat, lon, dir, season
     print(f"Variance fractions saved to: {var_fractions_file_path}")
 
 
-def save_model_results(df_coefficients, df_fl_pred_cov, dir, season, n_eofs=7):
+def save_model_results(df_coefficients, df_fl_pred_cov, dir, season, month_init, n_eofs):
     """
     Save the model coefficients and prediction covariances to NetCDF files.
 
@@ -165,7 +165,7 @@ def save_model_results(df_coefficients, df_fl_pred_cov, dir, season, n_eofs=7):
     coefficients_xr = xr.Dataset.from_dataframe(df_coefficients)
 
     # Save the coefficients
-    coefficients_file_path = f"{dir}model_coefficients_{season}.nc"
+    coefficients_file_path = f"{dir}model_coefficients_{season}_month_{month_init}.nc"
     print(f"Saving model coefficients...")
     coefficients_xr.to_netcdf(coefficients_file_path)
     print(f"Model coefficients saved to: {coefficients_file_path}")
@@ -181,7 +181,7 @@ def save_model_results(df_coefficients, df_fl_pred_cov, dir, season, n_eofs=7):
     )
 
     # Save the prediction covariances
-    covariances_file_path = f"{dir}prediction_covariances_{season}.nc"
+    covariances_file_path = f"{dir}prediction_covariances_{season}_month_{month_init}.nc"
     print(f"Saving prediction covariances...")
     cov_ds.to_netcdf(covariances_file_path)
     print(f"Prediction covariances saved to: {covariances_file_path}")

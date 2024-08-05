@@ -1,16 +1,12 @@
-
-import numpy as np
-import matplotlib.pyplot as plt
-
-#import pickle
-
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+import matplotlib.pyplot as plt
+import numpy as np
 
 from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.patches import Rectangle
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 def plot_fields_simple(fields, titles, cmap, unit, lat, lon, season, year):
@@ -63,8 +59,6 @@ def plot_combined_terciles(prob_bn, prob_an, lat, lon, season, year):
 
     # Calculate normal probability
     prob_nn = 1 - (prob_bn + prob_an)
-    for i in range(len(prob_bn)):
-        print(np.nanmax(prob_nn[i]))
     
     # Create custom colormaps for each tercile
     cmap_bn = LinearSegmentedColormap.from_list('custom_bn', ['#FFFFFF', '#FF0000'], N=100)
