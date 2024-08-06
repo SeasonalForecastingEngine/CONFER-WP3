@@ -1,6 +1,7 @@
 
 import os
 import sys
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -53,7 +54,10 @@ for year in years:
             for ifn in range(ndays_pentad):
                 dataset = gdal.Open(f'{rfe2_daily_dir}{filenames_pentad[ifn]}')
                 band1 = dataset.GetRasterBand(1)
-                prcp_daily[ifn,:,:] = band1.ReadAsArray()
+                if band1.XSize != nlon or band1.YSize != nlat:
+                    warnings.warn(f"Dimensions of {filenames_pentad[ifn]} do not match the dimensions of the other files. Data could not be loaded.")
+                else:
+                    prcp_daily[ifn,:,:] = band1.ReadAsArray()
             prcp_pentad[im*6+ipt,:,:] = np.sum(prcp_daily, axis=0)
     print(f"saving pentad data as '{rfe2_pentad_dir}{filename_out}'.")
     da_prcp_pct = xr.DataArray(
