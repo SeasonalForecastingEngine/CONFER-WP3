@@ -1,5 +1,3 @@
-# Ignore validation data for now
-validation_data/
 
 .poetry/
 

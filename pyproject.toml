@@ -12,7 +12,7 @@ build-backend = "poetry.core.masonry.api"
 name = "confer_wp3"
 version = "0.1.1"
 description = "Python code related to seasonal forecasting over GHA, developed in WP3 of the CONFER project"
-authors = ["Michael Scheuerer"]
+authors = ["Michael Scheuerer and Aslak Hellevik"]
 license = "Proprietary."         # The license of your package.
 readme = "README.md"
 # Below, we specify to poetry which package should be included. As it is now, we are telling poetry to include the package called "package_name".
