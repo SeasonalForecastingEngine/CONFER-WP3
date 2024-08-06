@@ -5,21 +5,16 @@ An **R-package for forecast evaluation** was also developed in this work package
 
 
 
-
 ## Installation
 
-To install the package ...
+Since the Jupyter notebooks in `notebooks` are the most user-friendly option to drive the underlying functions, it is recommended to clone the repository
+* `git clone https://github.com/SeasonalForecastingEngine/CONFER-WP3.git`
 
-1. Change the name of the directory "package_name" inside the "src"-folder to the name of the package you are developing.
-2. In the "pyproject.toml"-file, the following changes must made:
+and then install the package from the cloned repository using either `poetry` (which takes care of all dependencies) or
+* `pip install .`
 
-    a) The information about the package, such as the name of the package, its author(s), the version of the package and so forth must be specified in the top of the file beneath the `[poetry.tool]`-header.
-
-    b) Dependencies of the package are included below the `[tool.poetry.dependencies]` header. Here, you can also specify which Python versions the package is compatible with. This can also be left empty, and our package manager `poetry` will update it when new packages are added, more on this later.
-
-    c) *Optional*. When developing and using the package, it can be useful to provided examples of how the package can be used. This could e.g. entail running unit tests, or plotting some results of the package which would require the use of a library like `matplotlib`. This means that there are packages that are required in development that are not a dependency of the package. Such development dependencies are specified below the header `[tool.poetry.group.dev.dependencies]`, and can again be added using the poetry tool as explained below.
-
-If the above changes have been made, you are ready to install the package and start developing it. In order to do that, we will introduce you to a package manager called "poetry" in the following sections.
+after all dependencies have been installed manually. If just the package is needed (without the notebooks) it can be installed via
+* `pip install confer-wp3@git+https://github.com/SeasonalForecastingEngine/CONFER-WP3.git`
 
 
 
@@ -74,5 +69,7 @@ ERA5 reanalysis data can be downloaded from the [Climate Data Store (CDS)](https
 
 ### Seasonal forecasts of daily precipitation amounts
 
-Seasonal forecasts of daily precipitation amounts by various forecast centers can also be downloaded from the [Climate Data Store (CDS)](https://cds.climate.copernicus.eu/#!/home). It is assumed that these data are converted to the NetCDF format, and that the forecast data folder referred to in the Jupyter notebooks contains all files of the form 'total_precipitation\_<forecast system\>\_<forcast year\>\_<initialization month\>.nc' required by the choices of a forecast system, training period, and forecast initialization month specified in the respective Jupyter notebooks.
+Seasonal forecasts of daily precipitation amounts by various forecast centers can also be downloaded from the [Climate Data Store (CDS)](https://cds.climate.copernicus.eu/#!/home). Our code for reading the forecasts assumes one of the two following filename and format conventions:
+* If the name of the folder in which the forecasts are stored ends in '_nc', all filenames are assumed to have the form 'total_precipitation\_<forecast system\>\_<forcast year\>\_<initialization month\>.nc', e.g. 'total_precipitation_ecmwf_2023_5.nc'. Initialization month is here given as an interger between 1 and 12.
+* If the name of the folder in which the forecasts are stored ends in '_grib`', all filenames are assumed to have the form '<forecast system\>\_<initialization month\>\_<forcast year\>.grib', e.g. 'ecmwf_may_2023.grib'. Initialization month is here given as a 3-character string.
 

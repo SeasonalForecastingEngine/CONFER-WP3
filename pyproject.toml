@@ -10,7 +10,7 @@ build-backend = "poetry.core.masonry.api"
 # Information about the project and authors should be filled in the fields below.
 # If some of the fields are not relevant to your project, they can be removed.
 name = "confer_wp3"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python code related to seasonal forecasting over GHA, developed in WP3 of the CONFER project"
 authors = ["Michael Scheuerer"]
 license = "Proprietary."         # The license of your package.
@@ -25,29 +25,30 @@ packages = [
 # Below this header, the Python version of the project and the dependencies of the package are listed.
 # The fields below can be left blank and poetry will update them for you when a package is added or removed
 # using "poetry add <package>"/"poetry remove <package>".
-python = ">=3.9,<3.13" # Required Python versions
-numpy = "==1.24.4" # Needed for EOF package
+
+python = ">=3.8,<3.13" # Required Python versions
+Cartopy = ">=0.21.1"
+cfgrib = "^0.9.12.0"
+dask = "^2023.6.0"
+eccodes = ">=1.3.2"
+eofs = "^1.4.1"
+matplotlib = ">=3.7.1"
+netCDF4 = ">=1.5.5.1"
+numpy = ">=1.24.2"
+scikit-learn = ">=1.1.2"
 scipy = ">=1.10.1"
 xarray = ">=2023.1.0"
-eccodes = ">=1.3.2"
-netCDF4 = ">=1.5.5.1"
-matplotlib = ">=3.7.1"
-Cartopy = ">=0.21.1"
-scikit-learn = ">=1.1.2" # Unsure if this works
-# pickle ?!?
-eofs = "^1.4.1"
-memory-profiler = "^0.61.0"
 
 
 [tool.poetry.group.dev.dependencies]
 # Packages needed in development, but not in the package.
 # Typically, this would be testing frameworks (e.g. pytest) and linters (e.g. ruff).
 # A package can be added as a group dependency by "poetry add <package> --group dev"
-pytest = ">=7.1.3"  # Library for testing (recommended)
-ruff = ">=0.2.0"     # Linting and formatting library (recommended)
+#pytest = ">=7.1.3"  # Library for testing (recommended)
+#ruff = ">=0.2.0"     # Linting and formatting library (recommended)
 # Libraries for running jupyter notebooks:
 ipython = ">=7.21.0"
-ipykernel = ">=6.29.2"
+ipykernel = ">=6.23.2"
 jupyter = ">=1.0.0"
 
 [tool.poetry.group.tutorial.dependencies]
@@ -59,24 +60,24 @@ pandas = ">=2.0.0"
 
 [tool.pytest.ini_options]
 # (Recommended.) Configure 'pytest'. If the pytest-library is used for testing, specifications can be given here.
-minversion = "6.0"
-addopts = "-ra -q"
-testpaths = [
-    "tests",
+#minversion = "6.0"
+#addopts = "-ra -q"
+#testpaths = [
+#    "tests",
     # Any other folders with tests in them:
     # "integration",
-]
+#]
 
 [tool.ruff]
 # (Recommended.) ruff is a Python linter and code formatter. This is an optional field and can be removed.
 # Otherwise, the field can be used to give instructions to ruff.
-line-length = 120
-indent-width = 4
-target-version = "py310" # Specify to ruff what the minimum Python version to target is (here, Python 3.10)
+#line-length = 120
+#indent-width = 4
+#target-version = "py310" # Specify to ruff what the minimum Python version to target is (here, Python 3.10)
 
 [tool.ruff.format]
 # (Recommended.) Specify formatting options to ruff
-quote-style = "double"              # Specify to ruff that double quotation marks should be used
-indent-style = "space"              # Indent with spaces, rather than tabs.
-skip-magic-trailing-comma = true    # Do not respect magic trailing commas.
-line-ending = "auto"                # Automatically detect the appropriate line ending.
+#quote-style = "double"              # Specify to ruff that double quotation marks should be used
+#indent-style = "space"              # Indent with spaces, rather than tabs.
+#skip-magic-trailing-comma = true    # Do not respect magic trailing commas.
+#line-ending = "auto"                # Automatically detect the appropriate line ending.
