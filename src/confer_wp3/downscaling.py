@@ -16,8 +16,8 @@ from .utils import _preprocess, month_init_dict, get_filename, interpolate_forec
 
 def calculate_target_percentiles(target, year_train_start, year_train_end, lon_bnds, lat_bnds, target_dir, filename_pct_target):
     requested_years = [*range(year_train_start, year_train_end+1)]
-    filename_str = {'chirps':'chirps-v2.0', 'imerg':'imerg'}[target]
-    res_str = {'chirps':'_p25', 'imerg':''}[target]
+    filename_str = {'chirps':'chirps-v2.0', 'imerg':'imerg', 'rfe2':'rfe2'}[target]
+    res_str = {'chirps':'_p25', 'imerg':'', 'rfe2':''}[target]
     available_years = [year for year in requested_years if path.exists(f'{target_dir}/{filename_str}.{year}.pentads{res_str}.nc')]
     if len(available_years) < len(requested_years):
         missing_years = ' '.join(map(str, list(set(requested_years).difference(set(available_years)))))

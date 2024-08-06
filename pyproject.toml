@@ -57,6 +57,7 @@ jupyter = ">=1.0.0"
 # Typically such examples can be found in a "notebooks/"-folder in the project folder (a level up from the "src"-folder)
 # A package can be added as tutorial dependency by "poetry add <package> --group tutorial"
 pandas = ">=2.0.0"
+gdal = ">=3.6.0"
 
 [tool.pytest.ini_options]
 # (Recommended.) Configure 'pytest'. If the pytest-library is used for testing, specifications can be given here.
