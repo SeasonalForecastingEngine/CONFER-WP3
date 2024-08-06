@@ -30,7 +30,7 @@ def validate_anomalies1(prec_data, anomalies, lat, lon, year_index=0):
     lon_grid, lat_grid = np.meshgrid(lon, lat)
 
     # Plot original precipitation data
-    plt.figure(figsize=(8, 10))  # Adjusting figsize for a more even aspect ratio
+    plt.figure(figsize=(8, 10))
     plt.subplot(2, 1, 1)
     plt.title('Original Precipitation Data')
     plt.pcolormesh(lon_grid, lat_grid, prec_data[year_index, :, :], cmap='viridis', shading='auto')
@@ -170,7 +170,7 @@ def validate_eofs(eofs_reshaped, title, n_eofs):
     Visualize the Empirical Orthogonal Functions (EOFs) as a series of plots.
 
     Parameters:
-    - eofs (numpy.ndarray): A 2D numpy array of the computed EOFs with dimensions (n_eofs, lat, lon).
+    - eofs (numpy.ndarray): A 3D numpy array of the computed EOFs with dimensions (n_eofs, lat, lon).
     - title (str): The title for the entire plot.
     - n_eofs (int): The number of EOFs to plot.
 
@@ -235,7 +235,7 @@ def validate_pcs(anomalies_normal, eofs_reshaped, pcs, lat, lon, year, period_tr
     - year (numpy.ndarray): A 1D numpy array of years corresponding to the time dimension of `anomalies_normal`.
     - period_train (tuple): A tuple specifying the training period as (start_year, end_year).
     - season (str): The season for which the analysis is performed.
-    - n_eofs (int, optional): The number of EOFs to compute and validate. Default is 7.
+    - n_eofs (int, optional): The number of EOFs to compute and validate.
 
     Returns:
     - None: The function generates and displays several plots comparing the calculated PCs with reference time series.
@@ -313,11 +313,11 @@ def validate_indices(era5_indices, filepath_indices, period_train, year_fcst):
     """
     Validates calculated indices against reference indices and prints comparisons for specified forecast months.
 
-    Args:
-    era5_indices (pd.DataFrame): Dataframe containing ERA5 indices with columns 'year', 'month', and index names.
-    filepath_indices (str): Filepath prefix where reference index files are located.
-    period_train (tuple): A tuple containing the start and end years (inclusive) for the training period.
-    year_fcst (int): The forecast year for which the validation is being performed.
+    Parameters:
+    - era5_indices (pd.DataFrame): Dataframe containing ERA5 indices with columns 'year', 'month', and index names.
+    - filepath_indices (str): Filepath prefix where reference index files are located.
+    - period_train (tuple): A tuple containing the start and end years (inclusive) for the training period.
+    - year_fcst (int): The forecast year for which the validation is being performed.
 
     Returns:
     None
@@ -356,7 +356,6 @@ def validate_indices(era5_indices, filepath_indices, period_train, year_fcst):
 def validate_ml_coefficients(df_coefficients, period_train, season, month_init):
     """
     Validate and visualize the machine learning model coefficients.
-
     This function generates a heatmap to visualize the coefficients of a machine learning model
     for a specified training period, season, and initialization month.
 
@@ -371,14 +370,6 @@ def validate_ml_coefficients(df_coefficients, period_train, season, month_init):
     Returns:
     - None: The function displays a heatmap of the model coefficients.
     """
-    # Define month string dictionary
-    month_str = {
-        1: "January", 2: "February", 3: "March", 4: "April",
-        5: "May", 6: "June", 7: "July", 8: "August",
-        9: "September", 10: "October", 11: "November", 12: "December"
-    }[month_init]
-
-    # Create the plot
     fig, ax = plt.subplots(figsize=(10, 6))
 
     # Plot the coefficients
@@ -397,7 +388,6 @@ def validate_ml_coefficients(df_coefficients, period_train, season, month_init):
     cbar_ax = fig.add_axes([0.9, 0.15, 0.03, 0.7])
     fig.colorbar(img, cax=cbar_ax)
 
-    # Display the plot
     plt.show()
 
 
@@ -409,9 +399,8 @@ def validate_forecast(prob_bn, prob_an, prec_data, period_clm, period_train, yea
     - prob_bn (numpy.ndarray): Array of probabilities for below-normal precipitation.
     - prob_an (numpy.ndarray): Array of probabilities for above-normal precipitation.
     - prec_data (numpy.ndarray): 3D array of precipitation data with dimensions (time, lat, lon).
-    - ref_period_indices (list): List of indices corresponding to the reference period for calculating percentiles.
-    - period_train (tuple): Tuple containing the start and end years of the training period (e.g., (1981, 2020)).
     - period_clm (tuple): Tuple containing the start and end years of the reference period (e.g., (1993, 2020)).
+    - period_train (tuple): Tuple containing the start and end years of the training period (e.g., (1981, 2020)).
     - year (numpy.ndarray): A 1D numpy array of years corresponding to the time dimension of `anomalies_normal`.
     - lat (numpy.ndarray): 1D array of latitude values.
     - lon (numpy.ndarray): 1D array of longitude values.

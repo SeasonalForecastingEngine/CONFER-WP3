@@ -136,7 +136,7 @@ def compute_eofs_pcs(anomalies_normal, n_eofs):
     variance_fraction = solver.varianceFraction(neigs=n_eofs)
 
     # Code for flipping value of first EOF if it is negative.
-    # This helps with the interpretability of the plot of model coefficients, as the coefficients for eof1 will correspond in sign to the intuitive interpretation of positive sign signifiying positive association and vice versa.
+    # This helps with the interpretability of the plot of model coefficients, as the coefficients for eof1 will correspond with a positive sign in the plot.
     # Check if the first EOF is predominantly negative
     if np.sum(eofs[0] < 0) > np.sum(eofs[0] > 0):
         # If it is, flip the sign of the first EOF and its corresponding PC
@@ -302,7 +302,7 @@ def standardize_index(data, index_name, period_clm, year_fcst, month_init):
 
 def standardize_index_diff1(data, index_name, period_clm, year_fcst, month_init):
     """
-    Calculates the standardized difference between the current and previous month's index values for a given dataset, index name, reference period, forecast year, and initialization month.
+    Calculates the difference between the current and previous month's index values for a given dataset, index name, reference period, forecast year, and initialization month.
 
     Args:
     data (xarray.Dataset): The dataset containing the data to be used for index calculation.
@@ -354,7 +354,8 @@ def standardize_index_diff1(data, index_name, period_clm, year_fcst, month_init)
     return difference
 
     # Code that standardizes one more time after calculating differences.
-    # This is an alternative implementation that could also be sensible, but is not currently used to replicate previously calculated indices.
+    # This is an alternative implementation that could also be sensible, but is not currently used in order to replicate previously calculated indices.
+    # Would need some updating to work.
 """
     # Calculate climatology and standard deviation of differences
     diff_data = xr.concat([
@@ -400,7 +401,7 @@ def prepare_time_series_data(data, index_name, period_clm, period_train, months,
                 year_corrected = year
                 month_corrected = month + 1
             
-            # Set variable fixing first value
+            # Set variable fixing the problem of not having data to compute first value
             first_val = False
 
             if diff1:
@@ -409,7 +410,7 @@ def prepare_time_series_data(data, index_name, period_clm, period_train, months,
                     first_val = True    # Sets to 0 further down in the function
                 else:
                     standardized_anomaly = standardize_index_diff1(data, index_name, period_clm, year_corrected, month_corrected)
-                # Alternatively, deal with first two datapoints not available by copying the first available one
+                # Alternatively, deal with first datapoint not available by copying the first available one
                 # if year == period_train[0] and month == 1:
                 #     month_corrected += 1
                 #     standardized_anomaly = standardize_index_diff1(data, index_name, period_clm, year_corrected, month_corrected)
@@ -494,7 +495,7 @@ def get_ml_results(era5_indices, feature_names, pcs, var_fracs, n_eofs, period_t
     Fit a multi-task Lasso regression model and compute the prediction covariance.
 
     Parameters:
-    - era5_indices (pd.DataFrame): DataFrame containing ERA5 indices with columns ['year', 'month'] and other features.
+    - era5_indices (pd.DataFrame): DataFrame containing ERA5 indices with columns ['year', 'month'].
     - feature_names (list): List of feature names to be used in the regression model.
     - pcs (numpy.ndarray): Principal components as a 2D array with dimensions (years, n_eofs).
     - var_fracs (numpy.ndarray): Array containing the variance fractions explained by each EOF.
@@ -505,12 +506,11 @@ def get_ml_results(era5_indices, feature_names, pcs, var_fracs, n_eofs, period_t
 
     Returns:
     - df_coefficients (pd.DataFrame): DataFrame containing the fitted model coefficients.
-    - df_fl_pred_cov (pd.DataFrame): DataFrame containing the prediction covariance matrix for each verification year.
+    - df_fl_pred_cov (pd.DataFrame): DataFrame containing the prediction covariance matrix for each year.
     """
     # Cross-validation setup
     years_cv = list(range(period_train[0], period_train[1] + 1))  # Training years
     years_verif = list(range(period_clm[0], period_clm[1] + 1))   # Verification years
-    df_year = pd.DataFrame((np.array(years_cv) - 2000) / 10, index=years_cv, columns=['year'])
 
     # Select the data for the month before month_init
     previous_month = month_init - 1 if month_init > 1 else 12
@@ -527,7 +527,6 @@ def get_ml_results(era5_indices, feature_names, pcs, var_fracs, n_eofs, period_t
     # Feature pre-selection
     wgt = np.sqrt(var_fracs / np.sum(var_fracs))  # Calculate weights
     feature_idx = [True] + [False] * len(df_combined_features.columns)
-    
     for ift in range(len(feature_idx) - 1):
         pval = [pearsonr(y[:, ipc], X[:, ift])[1] for ipc in range(n_eofs)]
         feature_idx[1 + ift] = np.any(np.array(pval) < 0.1 * wgt)
@@ -569,12 +568,11 @@ def get_ml_results(era5_indices, feature_names, pcs, var_fracs, n_eofs, period_t
 def calculate_tercile_probability_forecasts(era5_indices, anomalies_normal, eofs_reshaped, df_coefficients, df_fl_pred_cov, var_fracs, feature_names, year, period_clm, n_eofs, year_fcst, month_init):
     """
     Calculate tercile probability forecasts for precipitation amounts using machine learning model coefficients and EOFs.
-
-    The plot of combined tercile probabilities currently never displays values in the normal category. 
-    I am not sure why, but I think this is most likely due to the values of prob_bn and prob_an coming from calculate_tercile_probability_forecasts always being too high to let normal become the largest category.
-
     This function calculates the below-normal (prob_bn) and above-normal (prob_an) tercile probabilities
     for precipitation amounts based on machine learning model predictions.
+
+    The plot of combined tercile probabilities currently never displays values in the normal category. 
+    I am not sure why, but I think this is most likely due to the values of prob_bn and prob_an coming from this function always being too high to let normal become the most likely category.
 
     Parameters:
     - era5_indices (pd.DataFrame): DataFrame containing ERA5 indices with columns ['year', 'month'] and other features.

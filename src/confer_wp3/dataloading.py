@@ -97,7 +97,7 @@ def save_anomalies(anomalies, year, lat, lon, dir, season, normalized=False):
     if normalized:
         print("Saving normalized anomalies...")
         anomalies_xr.to_netcdf(f"{dir}chirps_anomalies_normal_{season}.nc")
-        print(f"Normalized anomalies saved to: {dir}chirps_anomalies_{season}_normal.nc")
+        print(f"Normalized anomalies saved to: {dir}chirps_anomalies_normal_{season}.nc")
     else:
         print("Saving anomalies...")
         anomalies_xr.to_netcdf(f"{dir}chirps_anomalies_{season}.nc")
@@ -155,7 +155,8 @@ def save_model_results(df_coefficients, df_fl_pred_cov, dir, season, month_init,
     - df_fl_pred_cov (pd.DataFrame): A DataFrame containing the prediction covariances.
     - dir (str): The directory path where the NetCDF files will be saved.
     - season (str): The season to save anomalies for ('MAM', 'JJAS' or 'OND').
-    - n_eofs (int): Number of EOFs (default is 7).
+    - month_init (int): The initialization month for the model predictions.
+    - n_eofs (int): Number of EOFs.
 
     Returns:
     - None: The function saves the model results to NetCDF files in the specified directory.

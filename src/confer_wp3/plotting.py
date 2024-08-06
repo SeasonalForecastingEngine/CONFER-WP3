@@ -12,7 +12,6 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 def plot_fields_simple(fields, titles, cmap, unit, lat, lon, season, year):
     """
     Plot multiple fields on a single figure with individual colorbars.
-
     This function generates a side-by-side comparison of different fields (e.g., predicted probabilities for different terciles)
     on a map, each with its own colorbar. The fields are displayed using the specified colormaps and titles.
 
@@ -21,6 +20,8 @@ def plot_fields_simple(fields, titles, cmap, unit, lat, lon, season, year):
     - titles (list of str): List of titles for each subplot.
     - cmap (list of str or Colormap): List of colormaps to be used for each field.
     - unit (str): Unit label for the colorbars.
+    - lat (numpy.ndarray): 1D array of latitudes.
+    - lon (numpy.ndarray): 1D array of longitudes.
     - season (str): Season for which the fields are being plotted (e.g., 'MAM', 'JJAS', 'OND').
     - year (int): Year for which the fields are being plotted.
 
@@ -47,6 +48,7 @@ def plot_fields_simple(fields, titles, cmap, unit, lat, lon, season, year):
 def plot_combined_terciles(prob_bn, prob_an, lat, lon, season, year):
     """
     Plot the combined tercile probabilities on a single map with three color scales.
+    This function is currently not plotting the normal category correctly, although the error might be in calculate_tercile_percentiles.
 
     Parameters:
     - prob_bn (numpy.ndarray): 2D array of probabilities for below-normal precipitation.
@@ -56,7 +58,6 @@ def plot_combined_terciles(prob_bn, prob_an, lat, lon, season, year):
     - season (str): Season for which the fields are being plotted.
     - year (int): Year for which the fields are being plotted.
     """
-
     # Calculate normal probability
     prob_nn = 1 - (prob_bn + prob_an)
     
@@ -204,12 +205,3 @@ def plot_fields (fields_list, lon, lat, lon_bounds, lat_bounds, main_title, subt
     plt.tight_layout(rect=[0,0,1,0.95])
     fig.suptitle(main_title, fontsize=16)
     plt.show()
-
-
-
-
-
-
-
-
-
