@@ -48,18 +48,22 @@ All three sub-projects use CHIRPS v2.0 precipitation data at different aggregati
 
 For rainy season onset prediction, daily precipitation accumulations at 0.25 degree horizonal resolution are used directly in the form that can be downloaded [here](https://data.chc.ucsb.edu/products/CHIRPS-2.0/global_daily/netcdf/p25/). The scripts associated with rainy season onset prediction described above assumes that exact structure of filenames and variable names within each file.
 
-The downscaling of seasonal forecasts for use in streamflow prediction is performed at the pentad aggregation level, for which CHIRPS data can be downloaded [here](https://data.chc.ucsb.edu/products/CHIRPS-2.0/global_pentad/netcdf/) at 0.05 degree horizonal resolution. This hight resolution, however, poses some challenges with memory when the downscaling is performed over a larger region, and we therefore upscaled the data to 0.25 degree horizonal resolution. A Python script 'upscale_chirps_pentads.py' that performs this task is included in this package in the 'src/confer_wp3' folder and can be run from the command line with the path to the CHIRPS data as an argument, e.g.:
+The downscaling of seasonal forecasts for use in streamflow prediction is performed at the pentad aggregation level, for which CHIRPS data can be downloaded [here](https://data.chc.ucsb.edu/products/CHIRPS-2.0/global_pentad/netcdf/) at 0.05 degree horizonal resolution. This high resolution, however, poses some challenges with memory when the downscaling is performed over a larger region, and we therefore upscale the data to 0.25 degree horizonal resolution. A Python script 'upscale_chirps_pentads.py' that performs this task is included in this package in the 'scripts' folder and can be run from the command line with the path to the CHIRPS data as an argument, e.g.:
 
-`python upscale_chirps_pentads.py /data/my_chirps_directory/`
+`python upscale_chirps_pentads.py /data/my_chirps_pentad_directory/`
 
 For every original file 'chirps-v2.0.<year\>.pentads.nc', the script will create a file 'chirps-v2.0.<year\>.pentads_p25.nc' in the same directory and with the same variable names, and these naming conventions are assumed by the scripts associated with statistical downscaling of seasonal forecasts described above.
 
 The machine learning based probabilistic prediction of seasonal precipitation amounts uses CHIRPS data at the monthly aggregation level, which can be downloaded [here](https://data.chc.ucsb.edu/products/CHIRPS-2.0/global_monthly/netcdf/) as a single file.
 
 
-### IMERG precipitation data
+### IMERG and RFE2 precipitation data
 
-For the downscaling of seasonal forecasts for use in streamflow prediction we alternatively facilitate the use of IMERG precipitation data which can e.g. be downloaded [here](https://disc.gsfc.nasa.gov/datasets/GPM_3IMERGHH_06/summary?keywords=%22IMERG%20final%22) at 0.1 degree horizonal resolution. Regardless of the data source, it is assumed that the data are aggregated to pentads and stored as a set of files of the type 'imerg.<year\>.pentads.nc' analoguous to the CHIRPS data described above. The 0.1 degree horizonal resolution did not pose any problems for the domain considered in this project and is assumed by the scripts associated with the downscaling of seasonal forecasts.
+For the downscaling of seasonal forecasts for use in streamflow prediction we alternatively facilitate the use of IMERG and RFE2 precipitation data which can e.g. be downloaded [here](https://ftp.cpc.ncep.noaa.gov/fews/fewsdata/africa/rfe2/) at 0.1 degree horizonal resolution. We obtained daily precipitation data in geotiff file format and used the Python scripts 'aggregate_imerg_data.py' and  'aggregate_rfe2_data.py' in the 'scripts' folder to aggregate these data to pentads and save them out as NetCDF files with a format similar to that of the CHIRPS data described above. These scripts can be run from the command line with the paths to the input and output directory as an argument, e.g.:
+
+`python aggregate_rfe2_data.py /data/my_rfe2_daily_directory/ /data/my_rfe2_pentad_directory/`
+
+Regardless of the data source, it is assumed that the data are aggregated to pentads and stored as a set of files of the type '<imerg/rfe2\>.<year\>.pentads.nc' analoguous to the CHIRPS data described above. The 0.1 degree horizonal resolution did not pose any problems for the domain considered in this project and is assumed by the scripts associated with the downscaling of seasonal forecasts.
 
 
 ### ERA5 reanalysis data
