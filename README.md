@@ -63,7 +63,7 @@ For the downscaling of seasonal forecasts for use in streamflow prediction we al
 
 `python aggregate_rfe2_data.py /data/my_rfe2_daily_directory/ /data/my_rfe2_pentad_directory/`
 
-Regardless of the data source, it is assumed that the data are aggregated to pentads and stored as a set of files of the type '<imerg/rfe2\>.<year\>.pentads.nc' analoguous to the CHIRPS data described above. The 0.1 degree horizonal resolution did not pose any problems for the domain considered in this project and is assumed by the scripts associated with the downscaling of seasonal forecasts.
+Regardless of the data source, it is assumed that the data are aggregated to pentads and stored as a set of files of the type 'rfe2.<year\>.pentads.nc' analoguous to the CHIRPS data described above. The 0.1 degree horizonal resolution did not pose any problems for the domain considered in this project and is assumed by the scripts associated with the downscaling of seasonal forecasts.
 
 
 ### ERA5 reanalysis data
