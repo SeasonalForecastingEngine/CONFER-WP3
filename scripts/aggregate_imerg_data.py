@@ -14,11 +14,12 @@ from osgeo import gdal
 imerg_daily_dir = sys.argv[1]
 imerg_pentad_dir = sys.argv[2]
 
-#imerg_daily_dir = '/home/michael/nr/samba/PostClimDataNoBackup/CONFER/Data/IMERG_daily/'
-#imerg_pentad_dir = '/home/michael/nr/samba/PostClimDataNoBackup/CONFER/Data/IMERG_pentad_nc/'
+#imerg_daily_dir = '/home/confer/michael/Data/IMERG_daily/'
+#imerg_pentad_dir = '/home/confer/michael/Data/IMERG_pentad/'
 
 filenames = np.sort(os.listdir(imerg_daily_dir))
-filenames_date = np.array([int(filename[24:32]) if filename[64:]=='tif' else np.nan  for filename in filenames])
+filenames = filenames[np.array([filename[64:]=='tif' for filename in filenames])]
+filenames_date = np.array([int(filename[24:32]) for filename in filenames])
 nfiles = len(filenames)
 
 years = np.unique((filenames_date//1e4).astype(int)).tolist()
