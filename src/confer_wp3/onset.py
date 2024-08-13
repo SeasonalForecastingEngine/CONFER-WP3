@@ -201,7 +201,7 @@ def calculate_onset_fcst(region, month_start, year_fcst, system, thresh_dry, thr
     nlat = len(lat_trgt)
     nlon = len(lon_trgt)
    # Load file with new forecasts
-    filename = get_filename(fcst_dir, system, year, month_start)
+    filename = get_filename(fcst_dir, system, year_fcst, month_start)
     if not path.exists(filename):
         raise Exception(f"No forecast data found for selected year {year_fcst}.")
     print("Loading and interpolating forecast data ...")
@@ -215,27 +215,23 @@ def calculate_onset_fcst(region, month_start, year_fcst, system, thresh_dry, thr
     prcp_fcst_3d = np.maximum(0., prcp_fcst_cum[:,(day_start+2):(day_start+ndts+2),:,:]-prcp_fcst_cum[:,(day_start-1):(day_start+ndts-1),:,:])
    # Interpolate forecasts and record exceedances of the 1-day/3-day threshold
     nmbs = prcp_fcst_cum.shape[0]
-    exc_1d = np.zeros((ndts,nmbs,nlat,nlon), dtype=bool)
-    exc_3d = np.zeros((ndts,nmbs,nlat,nlon), dtype=bool)
-    mask = np.zeros((ndts,nmbs,nlat,nlon), dtype=bool)
-    for idt in range(ndts):
-        prcp_fcst_1d_ip = interpolate_forecasts(prcp_fcst_1d[:,idt,:,:], lat_fcst, lon_fcst, lat_trgt, lon_trgt)
-        exc_1d[idt,:,:,:] = np.greater(prcp_fcst_1d_ip, thresh_dry[idt,None,:,:])
-        prcp_fcst_3d_ip = interpolate_forecasts(prcp_fcst_3d[:,idt,:,:], lat_fcst, lon_fcst, lat_trgt, lon_trgt)
-        exc_3d[idt,:,:,:] = np.greater(prcp_fcst_3d_ip, thresh_wet[idt,None,:,:])
-        mask[idt,:,:,:] = np.logical_or(np.isnan(prcp_fcst_1d_ip), np.isnan(thresh_dry[idt,None,:,:]))
+    prcp_fcst_1d_ip = interpolate_forecasts(prcp_fcst_1d, lat_fcst, lon_fcst, lat_trgt, lon_trgt)
+    exc_1d = np.greater(prcp_fcst_1d_ip, thresh_dry[None,:,:,:])
+    prcp_fcst_3d_ip = interpolate_forecasts(prcp_fcst_3d, lat_fcst, lon_fcst, lat_trgt, lon_trgt)
+    exc_3d = np.greater(prcp_fcst_3d_ip, thresh_wet[None,:,:,:])
+    mask = np.logical_or(np.isnan(prcp_fcst_1d_ip), np.isnan(thresh_dry[None,:,:,:]))
    # Calculate rainy season onset forecast based on these exceedances
     print("Calculating rainy season onset dates ...")
     if not isinstance(len_dry_spell, np.ndarray):
         len_dry_spell = np.full((nlat,nlon), len_dry_spell, dtype=int)
     onset_day_fcst = np.full((nmbs,nlat,nlon), np.nan, dtype=np.float32)
     for imb in range(nmbs):
-        if np.all(mask[:,imb,:,:]):
+        if np.all(mask[imb,:,:,:]):
             continue
         for ilat in range(nlat):
             for ilon in range(nlon):
-                if not np.any(mask[:,imb,ilat,ilon]):
-                    onset_day_fcst[imb,ilat,ilon] = find_onset_day(exc_1d[:,imb,ilat,ilon], exc_3d[:,imb,ilat,ilon], len_dry_spell[ilat,ilon])
+                if not np.any(mask[imb,:,ilat,ilon]):
+                    onset_day_fcst[imb,ilat,ilon] = find_onset_day(exc_1d[imb,:,ilat,ilon], exc_3d[imb,:,ilat,ilon], len_dry_spell[ilat,ilon])
     return onset_day_fcst
 
 
