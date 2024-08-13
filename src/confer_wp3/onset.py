@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from scipy.interpolate import interp1d
 
 from .glp import domain_boundaries, global_parameters
-from .utils import _preprocess, get_filename, interpolate_forecasts
+from .utils import _preprocess, month_init_dict, get_filename, interpolate_forecasts
 
 
 
@@ -133,7 +133,7 @@ def calculate_adjusted_thresholds(region, month_start, year_clm_start, year_clm_
     lon_bnds, lat_bnds = domain_boundaries(region)
     day_start, nwks, ndts, ntwd = global_parameters()
    # Load CHIRPS data and calculate 1-day/3-day precipitation amounts and their climatological probabilities not exceeding the chosen threshold values
-    year_data_end = (datetime(year_clm_end,month_start,day_start)+timedelta(days=ndts+1)).year
+    year_data_end = (datetime(year_clm_end,month_init_dict[month_start],day_start)+timedelta(days=ndts+1)).year
     requested_years = [*range(year_clm_start, year_data_end+1)]
     available_years = [year for year in requested_years if path.exists(f'{chirps_dir}/chirps-v2.0.{year}.days_p25.nc')]
     years_clm = list(set([*range(year_clm_start, year_clm_end+1)]).intersection(available_years))
@@ -152,7 +152,7 @@ def calculate_adjusted_thresholds(region, month_start, year_clm_start, year_clm_
     prcp_1d =  np.full((nyrs,ndts+ntwd+1,nlat,nlon), np.nan, dtype=float)
     prcp_3d =  np.full((nyrs,ndts+ntwd+1,nlat,nlon), np.nan, dtype=float)
     for iyr in range(nyrs):
-        date_start = datetime(years_clm[iyr],month_start,1)
+        date_start = datetime(years_clm[iyr],month_init_dict[month_start],1)
         date_end_1d = date_start + timedelta(days=ndts+ntwd)
         date_end_3d = date_start + timedelta(days=ndts+ntwd+2)
         prcp_1d[iyr,:,:,:] = ds.sel(time=slice(date_start,date_end_1d)).precip.values
@@ -166,13 +166,13 @@ def calculate_adjusted_thresholds(region, month_start, year_clm_start, year_clm_
     prcp_3d_pb_thr_wet = calculate_prob_below_threshold(prcp_3d, thr_wet)
    # Load hindcast data and calculate 1-day/3-day precipitation amounts
     requested_years = [*range(year_clm_start, year_clm_end+1)]
-    available_years = [year for year in requested_years if path.exists(get_filename(fcst_dir, system, year, month_init))]
+    available_years = [year for year in requested_years if path.exists(get_filename(fcst_dir, system, year, month_start))]
     if len(available_years) < len(requested_years):
         missing_years = ' '.join(map(str, list(set(requested_years).difference(set(available_years)))))
         warnings.warn(f"The following years of {system.upper()} forecast data could not be loaded:"+"\n"+missing_years)
     if len(available_years) == 0:
         raise Exception("No forecast data found to calculate percentiles.")
-    file_list = [get_filename(fcst_dir, system, year, month_init) for year in available_years]
+    file_list = [get_filename(fcst_dir, system, year, month_start) for year in available_years]
     ds = xr.open_mfdataset(file_list[0], preprocess=partial_func)
     lon_fcst = ds.lon.values
     lat_fcst = ds.lat.values
@@ -204,7 +204,7 @@ def calculate_onset_fcst(region, month_start, year_fcst, system, thresh_dry, thr
     nlat = len(lat_trgt)
     nlon = len(lon_trgt)
    # Load file with new forecasts
-    filename = get_filename(fcst_dir, system, year, month_init)
+    filename = get_filename(fcst_dir, system, year, month_start)
     if not path.exists(filename):
         raise Exception(f"No forecast data found for selected year {year_fcst}.")
     print("Loading and interpolating forecast data ...")
