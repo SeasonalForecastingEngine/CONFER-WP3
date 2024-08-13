@@ -10,7 +10,7 @@ build-backend = "poetry.core.masonry.api"
 # Information about the project and authors should be filled in the fields below.
 # If some of the fields are not relevant to your project, they can be removed.
 name = "confer_wp3"
-version = "0.1.1"
+version = "0.1.2"
 description = "Python code related to seasonal forecasting over GHA, developed in WP3 of the CONFER project"
 authors = ["Michael Scheuerer and Aslak Hellevik"]
 license = "Proprietary."         # The license of your package.

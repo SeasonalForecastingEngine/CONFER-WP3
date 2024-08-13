@@ -12,6 +12,9 @@ from scipy.interpolate import interp1d
 from .utils import _preprocess, month_init_dict, get_filename, interpolate_forecasts
 
 
+month_init_dict = {'jan':1 ,'feb':2, 'mar':3, 'apr':4, 'may':5, 'jun':6, 'jul':7, 'aug':8, 'sep':9, 'oct':10, 'nov':11, 'dec':12}
+
+
 # Calculate the percentiles of the pentad climatology of the target data set
 
 def calculate_target_percentiles(target, year_train_start, year_train_end, lon_bnds, lat_bnds, target_dir, filename_pct_target):
@@ -186,6 +189,7 @@ def downscale_forecasts(system, year_fcst, month_init, pctl_fcst, pctl_target, l
     print("Loading and interpolating forecast data ...")
     partial_func = partial(_preprocess, lon_bnds=lon_bnds, lat_bnds=lat_bnds)
     ds = xr.open_mfdataset(filename, preprocess=partial_func)
+#    init_time = ds.time.values
     lon_fcst = ds.lon.values
     lat_fcst = ds.lat.values
     prcp_fcst = ds.precip.values
@@ -218,8 +222,8 @@ def downscale_forecasts(system, year_fcst, month_init, pctl_fcst, pctl_target, l
     print(f"Output saved as '{filename_precip_dwnsc}'.")
     da_prcp_daily_bc = xr.DataArray(
         data= prcp_daily_bc,
-        dims=['ensemble','lead_time','lat','lon'],
-        coords={'ensemble': [*range(nmbs)], 'lead_time': [*range(1,pentad_end_idx[-1]+2)], 'lat': lat_target, 'lon': lon_target,},
+        dims=['ensemble','time','lat','lon'],
+        coords={'ensemble': [*range(nmbs)], 'time': pd.date_range(f'{year_fcst}-{month_init_dict[month_init]:02}-01', periods=pentad_end_idx[-1]+1), 'lat': lat_target, 'lon': lon_target,},
         name='precip',
         attrs=dict(
             description=f'Downscaled {system.upper()} daily precipitation amounts',
