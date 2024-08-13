@@ -1,6 +1,7 @@
 
 import warnings
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 from os import path
@@ -10,9 +11,6 @@ from calendar import monthrange
 from scipy.interpolate import interp1d
 
 from .utils import _preprocess, month_init_dict, get_filename, interpolate_forecasts
-
-
-month_init_dict = {'jan':1 ,'feb':2, 'mar':3, 'apr':4, 'may':5, 'jun':6, 'jul':7, 'aug':8, 'sep':9, 'oct':10, 'nov':11, 'dec':12}
 
 
 # Calculate the percentiles of the pentad climatology of the target data set
