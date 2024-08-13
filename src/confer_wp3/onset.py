@@ -106,15 +106,12 @@ def interpolate_and_map_threshold(prcp_fcst, prob_below_thr, lat_fcst, lon_fcst,
     mask = np.any(np.isnan(prob_below_thr), axis=0)
     for itwd in range(ntwd-1):
         ilt = day_start + itwd - (ntwd-1)//2
-        prcp_fcst_ip = np.full((nyrs,nmbs,nlat,nlon), np.nan, dtype=float)
-        for iyr in range(nyrs):
-            prcp_fcst_ip[iyr,:,:,:] = interpolate_forecasts(prcp_fcst[iyr,:,ilt,:,:], lat_fcst, lon_fcst, lat_trgt, lon_trgt)
+        prcp_fcst_ip = interpolate_forecasts(prcp_fcst[:,:,ilt,:,:], lat_fcst, lon_fcst, lat_trgt, lon_trgt)
         prcp_fcst_sample[itwd,:,:,:] = np.nanquantile(prcp_fcst_ip, axis=(0,1), q=prob_qt)
     for idt in range(ndts):
         ilt = day_start + idt + (ntwd-1)//2
         itwd = (ntwd-1+idt) % ntwd           # index for the slice of the time window to be overwritten with new data
-        for iyr in range(nyrs):
-            prcp_fcst_ip[iyr,:,:,:] = interpolate_forecasts(prcp_fcst[iyr,:,ilt,:,:], lat_fcst, lon_fcst, lat_trgt, lon_trgt)
+        prcp_fcst_ip = interpolate_forecasts(prcp_fcst[:,:,ilt,:,:], lat_fcst, lon_fcst, lat_trgt, lon_trgt)
         prcp_fcst_sample[itwd,:,:,:] = np.nanquantile(prcp_fcst_ip, axis=(0,1), q=prob_qt)
         for ilat in range(nlat):
             for ilon in range(nlon):
