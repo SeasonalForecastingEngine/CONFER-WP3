@@ -104,14 +104,14 @@ def save_anomalies(anomalies, year, lat, lon, dir, season, normalized=False):
         print(f"Anomalies saved to: {dir}chirps_anomalies_{season}.nc")
 
 
-def save_eofs_pcs(eofs_reshaped, pcs, var_fractions, year, lat, lon, dir, season):
+def save_eofs_pcs(eofs_reshaped, pcs, eof_lambda, year, lat, lon, dir, season):
     """
     Save the calculated EOFs, PCs, and variance fractions to NetCDF files.
 
     Parameters:
     - eofs_reshaped (numpy.ndarray): A 3D numpy array of EOFs with dimensions (n_eofs, lat, lon).
     - pcs (numpy.ndarray): A 2D numpy array of PCs with dimensions (year, n_eofs).
-    - var_fractions (numpy.ndarray): A 1D numpy array of the fraction of variance explained by each EOF.
+    - eof_lambda (numpy.ndarray): A 1D numpy array of the eigenvalues associated with each EOF.
     - year (numpy.ndarray): A 1D numpy array of years corresponding to the first dimension of `pcs`.
     - lat (numpy.ndarray): A 1D numpy array of latitudes corresponding to the spatial dimensions of `eofs`.
     - lon (numpy.ndarray): A 1D numpy array of longitudes corresponding to the spatial dimensions of `eofs`.
@@ -119,13 +119,13 @@ def save_eofs_pcs(eofs_reshaped, pcs, var_fractions, year, lat, lon, dir, season
     - season (str): The season to save anomalies for ('MAM', 'JJAS' or 'OND').
 
     Returns:
-    - None: The function saves the EOFs, PCs, and variance fractions to NetCDF files in the specified directory.
+    - None: The function saves the EOFs, PCs, and EOF eigenvalues to NetCDF files in the specified directory.
     """
 
     # Convert EOFs, PCs and variance fractions to xarray DataArrays for saving as NetCDFs
     eofs_xr = xr.DataArray(eofs_reshaped, coords=[range(eofs_reshaped.shape[0]), lat, lon], dims=['eof', 'lat', 'lon'])
     pcs_xr = xr.DataArray(pcs, coords=[year, range(pcs.shape[1])], dims=['year', 'eof'])
-    var_fractions_xr = xr.DataArray(var_fractions, coords=[range(var_fractions.shape[0])], dims=['eof'])
+    eof_lambda_xr = xr.DataArray(eof_lambda, coords=[range(eof_lambda.shape[0])], dims=['eof'])
 
     # Save the EOFs
     eofs_file_path = f"{dir}chirps_eofs_{season}.nc"
@@ -139,11 +139,11 @@ def save_eofs_pcs(eofs_reshaped, pcs, var_fractions, year, lat, lon, dir, season
     pcs_xr.to_netcdf(pcs_file_path)
     print(f"PCs saved to: {pcs_file_path}")
 
-    # Save the variance fractions
-    var_fractions_file_path = f"{dir}chirps_var_fracs_{season}.nc"
-    print(f"Saving variance fractions...")
-    var_fractions_xr.to_netcdf(var_fractions_file_path)
-    print(f"Variance fractions saved to: {var_fractions_file_path}")
+    # Save the eigenvalues
+    eof_lambda_file_path = f"{dir}chirps_eof_lambda_{season}.nc"
+    print(f"Saving EOF eigenvalues...")
+    eof_lambda_xr.to_netcdf(eof_lambda_file_path)
+    print(f"Variance fractions saved to: {eof_lambda_file_path}")
 
 
 def save_model_results(df_coefficients, df_fl_pred_cov, dir, season, month_init, n_eofs):

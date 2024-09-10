@@ -118,7 +118,7 @@ def compute_eofs_pcs(anomalies_normal, n_eofs):
     Returns:
     - eofs (numpy.ndarray): A 2D numpy array of the computed EOFs with dimensions (n_eofs, space).
     - pcs (numpy.ndarray): A 2D numpy array of the computed PCs with dimensions (time, n_eofs).
-    - variance_fraction (numpy.ndarray): A 1D numpy array representing the fraction of variance explained by each EOF.
+    - eof_lambda (numpy.ndarray): A 1D numpy array representing the eigenvalues corresponding to each EOF.
     """
     # Reshape the anomalies_normal to 2D (time, space) for EOF computation
     year, lat, lon = anomalies_normal.shape
@@ -133,7 +133,7 @@ def compute_eofs_pcs(anomalies_normal, n_eofs):
     # Calculate the EOFs and PCs
     eofs = solver.eofs(neofs=n_eofs)
     pcs = solver.pcs(npcs=n_eofs)
-    variance_fraction = solver.varianceFraction(neigs=n_eofs)
+    eof_lambda = solver.eigenvalues(neigs=n_eofs)
 
     # Code for flipping value of first EOF if it is negative.
     # This helps with the interpretability of the plot of model coefficients, as the coefficients for eof1 will correspond with a positive sign in the plot.
@@ -143,7 +143,7 @@ def compute_eofs_pcs(anomalies_normal, n_eofs):
         eofs[0] *= -1
         pcs[:, 0] *= -1
     
-    return eofs, pcs, variance_fraction
+    return eofs, pcs, eof_lambda
 
 
 def get_region_indices(region):
@@ -490,7 +490,7 @@ def get_all_indices(sst_data, uwind200_data, uwind850_data, period_clm, period_t
     return era5_indices
 
 
-def get_ml_results(era5_indices, feature_names, pcs, var_fracs, n_eofs, period_train, period_clm, month_init):
+def get_ml_results(era5_indices, feature_names, pcs, eof_lambda, n_eofs, period_train, period_clm, month_init):
     """
     Fit a multi-task Lasso regression model and compute the prediction covariance.
 
@@ -498,7 +498,7 @@ def get_ml_results(era5_indices, feature_names, pcs, var_fracs, n_eofs, period_t
     - era5_indices (pd.DataFrame): DataFrame containing ERA5 indices with columns ['year', 'month'].
     - feature_names (list): List of feature names to be used in the regression model.
     - pcs (numpy.ndarray): Principal components as a 2D array with dimensions (years, n_eofs).
-    - var_fracs (numpy.ndarray): Array containing the variance fractions explained by each EOF.
+    - eof_lambda (numpy.ndarray): Array containing the eigenvalues corresponding to each EOF.
     - n_eofs (int): Number of EOFs to use.
     - period_train (tuple): Tuple (start_year, end_year) defining the training period.
     - period_clm (tuple): Tuple (start_year, end_year) defining the climatology period.
@@ -525,7 +525,7 @@ def get_ml_results(era5_indices, feature_names, pcs, var_fracs, n_eofs, period_t
     X = df_combined_features.to_numpy()
 
     # Feature pre-selection
-    wgt = np.sqrt(var_fracs / np.sum(var_fracs))  # Calculate weights
+    wgt = np.sqrt(eof_lambda / np.sum(eof_lambda))  # Calculate weights
     feature_idx = [True] + [False] * len(df_combined_features.columns)
     for ift in range(len(feature_idx) - 1):
         pval = [pearsonr(y[:, ipc], X[:, ift])[1] for ipc in range(n_eofs)]
@@ -565,7 +565,7 @@ def get_ml_results(era5_indices, feature_names, pcs, var_fracs, n_eofs, period_t
     return df_coefficients, df_fl_pred_cov
 
 
-def calculate_tercile_probability_forecasts(era5_indices, anomalies_normal, eofs_reshaped, df_coefficients, df_fl_pred_cov, var_fracs, feature_names, year, period_clm, n_eofs, year_fcst, month_init):
+def calculate_tercile_probability_forecasts(era5_indices, anomalies_normal, eofs_reshaped, df_coefficients, df_fl_pred_cov, eof_lambda, feature_names, year, period_clm, n_eofs, year_fcst, month_init):
     """
     Calculate tercile probability forecasts for precipitation amounts using machine learning model coefficients and EOFs.
     This function calculates the below-normal (prob_bn) and above-normal (prob_an) tercile probabilities
@@ -580,7 +580,7 @@ def calculate_tercile_probability_forecasts(era5_indices, anomalies_normal, eofs
     - eofs_reshaped (numpy.ndarray): 3D array of EOFs reshaped with dimensions (n_eofs, lat, lon).
     - df_coefficients (pd.DataFrame): DataFrame containing the model coefficients.
     - df_fl_pred_cov (pd.DataFrame): DataFrame containing the prediction covariance matrix for each year.
-    - var_fracs (numpy.ndarray): Array containing the variance fractions explained by each EOF.
+    - eof_lambda (numpy.ndarray): Array containing the eigenvalues corresponding to each EOF.
     - feature_names (list): List of feature names to be used in the regression model.
     - year (numpy.ndarray): 1D array of years corresponding to the anomalies_normal and era5_indices data.
     - period_clm (tuple): Tuple containing the start and end years of the climatology period (e.g., (1993, 2020)).
@@ -619,7 +619,7 @@ def calculate_tercile_probability_forecasts(era5_indices, anomalies_normal, eofs
     ts_indices = ts_indices.reindex(coefficients_columns)
     
     # Calculate residual variance
-    var_eps = scaling**2 - np.sum(var_fracs[:, None, None] * eofs_reshaped**2, axis=0)
+    var_eps = scaling**2 - np.sum(eof_lambda[:, None, None] * eofs_reshaped**2, axis=0)
 
     # Ensure ts_indices has year standardized
     ts_indices['year'] = (year_fcst - 2000) / 10
