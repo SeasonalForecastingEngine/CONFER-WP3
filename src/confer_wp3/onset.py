@@ -15,13 +15,13 @@ from .utils import _preprocess, month_init_dict, get_filename, interpolate_forec
 
 # Helper function that identifies the rainy season onset day for given threshold exceedances and length of critical dry period
 
-def find_onset_day(exc1d, exc3d, len_dry_spell):
+def find_onset_day(exc1d, exc3d, wnd_dry_spell, len_dry_spell):
     n = len(exc1d)
     wet_spell = np.logical_and(exc3d[:(n-2)], exc1d[:(n-2)])
     ind_dry_spell = np.expand_dims(np.arange(len_dry_spell),0)+np.expand_dims(np.arange(n-len_dry_spell+1),0).T
     dry_spell = np.all(~exc1d[ind_dry_spell], axis=1)
-    ind_dry_spell_wnd = np.expand_dims(np.arange(22-len_dry_spell),0)+np.expand_dims(np.arange(n-23),0).T
-    onset = np.logical_and(wet_spell[:(n-23)], ~np.any(dry_spell[3:][ind_dry_spell_wnd], axis=1))
+    ind_dry_spell_wnd = np.expand_dims(np.arange(wnd_dry_spell+1-len_dry_spell),0)+np.expand_dims(np.arange(n-2-wnd_dry_spell),0).T
+    onset = np.logical_and(wet_spell[:(n-2-wnd_dry_spell)], ~np.any(dry_spell[3:][ind_dry_spell_wnd], axis=1))
     onset_day = -1 if np.all(~onset) else np.nonzero(onset)[0][0]+1
     return onset_day
 
@@ -29,7 +29,7 @@ def find_onset_day(exc1d, exc3d, len_dry_spell):
 
 # Function that calculates historical onset dates from CHIRPS data
 
-def calculate_onset_hist(region, month_start, year_clm_start, year_clm_end, thr_dry, thr_wet, len_dry_spell, chirps_dir):
+def calculate_onset_hist(region, month_start, year_clm_start, year_clm_end, thr_dry, thr_wet, wnd_dry_spell, len_dry_spell, chirps_dir):
     lon_bnds, lat_bnds = domain_boundaries(region)
     day_start, nwks, ndts, ntwd = global_parameters()
     # Load CHIRPS data
@@ -60,6 +60,8 @@ def calculate_onset_hist(region, month_start, year_clm_start, year_clm_end, thr_
         thr_dry = np.full((nlat,nlon), thr_dry, dtype=float)
     if not isinstance(thr_wet, np.ndarray):
         thr_wet = np.full((nlat,nlon), thr_wet, dtype=float)
+    if not isinstance(wnd_dry_spell, np.ndarray):
+        wnd_dry_spell = np.full((nlat,nlon), wnd_dry_spell, dtype=int)
     if not isinstance(len_dry_spell, np.ndarray):
         len_dry_spell = np.full((nlat,nlon), len_dry_spell, dtype=int)
     exc_1d = np.greater(prcp_1d, thr_dry[None,None,:,:])
@@ -69,11 +71,16 @@ def calculate_onset_hist(region, month_start, year_clm_start, year_clm_end, thr_
         print(f"Calculating rainy season onset dates for {years_clm[iyr]} ...")
         for ilat in range(nlat):
             for ilon in range(nlon):
-                if len_dry_spell[ilat,ilon] < 2 or len_dry_spell[ilat,ilon] > 20:
+                if np.isnan(thr_dry[ilat,ilon]) or np.isnan(thr_wet[ilat,ilon]):
+                    continue
+                if wnd_dry_spell[ilat,ilon] < 3 or wnd_dry_spell[ilat,ilon] > 21:
+                    print("Warning! Invalid value for 'wnd_dry_spell'. Please choose a value between 3 and 21.")
+                    continue
+                if len_dry_spell[ilat,ilon] < 2 or len_dry_spell[ilat,ilon] >= wnd_dry_spell[ilat,ilon]:
                     print("Warning! Invalid value for 'len_dry_spell'. Calculation of rainy season onset date not possible.")
                     continue
                 if not np.any(np.isnan(prcp_1d[iyr,:,ilat,ilon])):
-                    onset_day[iyr,ilat,ilon] = find_onset_day(exc_1d[iyr,:,ilat,ilon], exc_3d[iyr,:,ilat,ilon], len_dry_spell[ilat,ilon])
+                    onset_day[iyr,ilat,ilon] = find_onset_day(exc_1d[iyr,:,ilat,ilon], exc_3d[iyr,:,ilat,ilon], wnd_dry_spell[ilat,ilon], len_dry_spell[ilat,ilon])
     return onset_day
 
 
@@ -106,13 +113,21 @@ def interpolate_and_map_threshold(prcp_fcst, prob_below_thr, lat_fcst, lon_fcst,
     mask = np.any(np.isnan(prob_below_thr), axis=0)
     for itwd in range(ntwd-1):
         ilt = day_start + itwd - (ntwd-1)//2
+        if np.all(np.isnan(prcp_fcst[:,:,ilt,:,:])):
+            continue
         prcp_fcst_ip = interpolate_forecasts(prcp_fcst[:,:,ilt,:,:], lat_fcst, lon_fcst, lat_trgt, lon_trgt)
         prcp_fcst_sample[itwd,:,:,:] = np.nanquantile(prcp_fcst_ip, axis=(0,1), q=prob_qt)
     for idt in range(ndts):
+        if day_start + idt >= nlt:                         # date outside the range of available lead times
+            thresh_adj[idt,:,:] = thresh_adj[idt-1,:,:]    #  -> constant extrapolation of adjusted thresholds
+            continue
         ilt = day_start + idt + (ntwd-1)//2
-        itwd = (ntwd-1+idt) % ntwd           # index for the slice of the time window to be overwritten with new data
-        prcp_fcst_ip = interpolate_forecasts(prcp_fcst[:,:,ilt,:,:], lat_fcst, lon_fcst, lat_trgt, lon_trgt)
-        prcp_fcst_sample[itwd,:,:,:] = np.nanquantile(prcp_fcst_ip, axis=(0,1), q=prob_qt)
+        itwd = (ntwd-1+idt) % ntwd            # index for the slice of the time window to be overwritten with new data        
+        if ilt < nlt:
+            prcp_fcst_ip = interpolate_forecasts(prcp_fcst[:,:,ilt,:,:], lat_fcst, lon_fcst, lat_trgt, lon_trgt)
+            prcp_fcst_sample[itwd,:,:,:] = np.nanquantile(prcp_fcst_ip, axis=(0,1), q=prob_qt)
+        else:
+            prcp_fcst_sample[itwd,:,:,:] = np.nan     # cut off time window at the end
         for ilat in range(nlat):
             for ilon in range(nlon):
                 if mask[ilat,ilon]:
@@ -126,7 +141,7 @@ def interpolate_and_map_threshold(prcp_fcst, prob_below_thr, lat_fcst, lon_fcst,
 
 # Main function for threshold adjustment: loads CHIRPS and forecast data, calculates climatological exceedance probabilities, and calls the helper function above
 
-def calculate_adjusted_thresholds(region, month_start, year_clm_start, year_clm_end, system, thr_dry, thr_wet, chirps_dir, fcst_dir):
+def calculate_adjusted_thresholds(region, month_start, year_clm_start, year_clm_end, system, thr_dry, thr_wet, chirps_dir, fcst_dir, cv=False):
     lon_bnds, lat_bnds = domain_boundaries(region)
     day_start, nwks, ndts, ntwd = global_parameters()
    # Load CHIRPS data and calculate 1-day/3-day precipitation amounts and their climatological probabilities not exceeding the chosen threshold values
@@ -159,8 +174,6 @@ def calculate_adjusted_thresholds(region, month_start, year_clm_start, year_clm_
         thr_dry = np.full((nlat,nlon), thr_dry, dtype=float)
     if not isinstance(thr_wet, np.ndarray):
         thr_wet = np.full((nlat,nlon), thr_wet, dtype=float)
-    prcp_1d_pb_thr_dry = calculate_prob_below_threshold(prcp_1d, thr_dry)
-    prcp_3d_pb_thr_wet = calculate_prob_below_threshold(prcp_3d, thr_wet)
    # Load hindcast data and calculate 1-day/3-day precipitation amounts
     requested_years = [*range(year_clm_start, year_clm_end+1)]
     available_years = [year for year in requested_years if path.exists(get_filename(fcst_dir, system, year, month_start))]
@@ -178,24 +191,48 @@ def calculate_adjusted_thresholds(region, month_start, year_clm_start, year_clm_
     prcp_fcst_1d = np.full((nyrs,nmbs,nlts-2,nlatf,nlonf), np.nan, dtype=np.float32)
     prcp_fcst_3d = np.full((nyrs,nmbs,nlts-2,nlatf,nlonf), np.nan, dtype=np.float32)
     for iyr in range(len(available_years)):
-        print(f"Loading {system.upper()} forecast data for {available_years[iyr]} ...")    
-        ds = xr.open_mfdataset(file_list[iyr], preprocess=partial_func)
-        prcp_fcst_cum = 1e3*np.insert(ds.precip.values[:nmbs,:nlts,:,:], 0, 0.0, axis=1)    # add zero accumulation at lead time 0
-        ds.close()
-        prcp_fcst_1d[iyr,:,:,:] = np.maximum(0., prcp_fcst_cum[:,1:-2,:,:]-prcp_fcst_cum[:,:-3,:,:])
-        prcp_fcst_3d[iyr,:,:,:] = np.maximum(0., prcp_fcst_cum[:,3:,:,:]-prcp_fcst_cum[:,:-3,:,:])
+        print(f"Loading {system.upper()} forecast data for {available_years[iyr]} ...")
+        if system == 'wrf':
+            ds = xr.open_mfdataset(file_list[iyr], preprocess=partial_func)
+            prcp_fcst_1d[iyr,:,:,:] = ds.precip.values[:,:-2,:,:]
+            prcp_fcst_3d[iyr,:,:,:] = ds.rolling(valid_time=3).sum().precip.values[:,2:,:,:]
+            ds.close()
+        else:
+            ds = xr.open_mfdataset(file_list[iyr], preprocess=partial_func)
+            prcp_fcst_cum = 1e3*np.insert(ds.precip.values[:nmbs,:nlts,:,:], 0, 0.0, axis=1)    # add zero accumulation at lead time 0
+            ds.close()
+            prcp_fcst_1d[iyr,:,:,:] = np.maximum(0., prcp_fcst_cum[:,1:-2,:,:]-prcp_fcst_cum[:,:-3,:,:])
+            prcp_fcst_3d[iyr,:,:,:] = np.maximum(0., prcp_fcst_cum[:,3:,:,:]-prcp_fcst_cum[:,:-3,:,:])
    # Compose a moving window forecast sample, estimate model climatology, and use to quantile-map the threshold values
     print("Calculating adjusted dry spell thresholds ...")
-    thr_dry_adj = interpolate_and_map_threshold(prcp_fcst_1d, prcp_1d_pb_thr_dry, lat_fcst, lon_fcst, lat_chirps, lon_chirps)
+    if cv:
+        thr_dry_adj = np.full((nyrs,ndts,nlat,nlon), np.nan, dtype=float)
+        for iyr in range(nyrs):
+            prcp_1d_cv = np.delete(prcp_1d, iyr, axis=0)
+            prcp_1d_pb_thr_dry = calculate_prob_below_threshold(prcp_1d_cv, thr_dry)
+            prcp_fcst_1d_cv = np.delete(prcp_fcst_1d, iyr, axis=0)
+            thr_dry_adj[iyr,:,:,:] = np.minimum(thr_dry[None,:,:]*5, np.maximum(interpolate_and_map_threshold(prcp_fcst_1d_cv, prcp_1d_pb_thr_dry, lat_fcst, lon_fcst, lat_chirps, lon_chirps), thr_dry[None,:,:]/5))
+    else:
+        prcp_1d_pb_thr_dry = calculate_prob_below_threshold(prcp_1d, thr_dry)
+        thr_dry_adj = np.minimum(thr_dry[None,:,:]*5, np.maximum(interpolate_and_map_threshold(prcp_fcst_1d, prcp_1d_pb_thr_dry, lat_fcst, lon_fcst, lat_chirps, lon_chirps), thr_dry[None,:,:]/5))
     print("Calculating adjusted wet spell thresholds ...")
-    thr_wet_adj = interpolate_and_map_threshold(prcp_fcst_3d, prcp_3d_pb_thr_wet, lat_fcst, lon_fcst, lat_chirps, lon_chirps)
+    if cv:
+        thr_wet_adj = np.full((nyrs,ndts,nlat,nlon), np.nan, dtype=float)
+        for iyr in range(nyrs):
+            prcp_3d_cv = np.delete(prcp_3d, iyr, axis=0)
+            prcp_3d_pb_thr_wet = calculate_prob_below_threshold(prcp_3d_cv, thr_wet)
+            prcp_fcst_3d_cv = np.delete(prcp_fcst_3d, iyr, axis=0)
+            thr_wet_adj[iyr,:,:,:] = np.minimum(thr_wet[None,:,:]*5, np.maximum(interpolate_and_map_threshold(prcp_fcst_3d_cv, prcp_3d_pb_thr_wet, lat_fcst, lon_fcst, lat_chirps, lon_chirps), thr_wet[None,:,:]/5))
+    else:
+        prcp_3d_pb_thr_wet = calculate_prob_below_threshold(prcp_3d, thr_wet)
+        thr_wet_adj = np.minimum(thr_wet[None,:,:]*5, np.maximum(interpolate_and_map_threshold(prcp_fcst_3d, prcp_3d_pb_thr_wet, lat_fcst, lon_fcst, lat_chirps, lon_chirps), thr_wet[None,:,:]/5))
     return thr_dry_adj, thr_wet_adj
 
 
 
 # Function for calculating a rainy season onset date based on a new set of ensemble forecasts and adjusted thresholds
 
-def calculate_onset_fcst(region, month_start, year_fcst, system, thresh_dry, thresh_wet, len_dry_spell, lat_trgt, lon_trgt, fcst_dir):
+def calculate_onset_fcst(region, month_start, year_fcst, system, thresh_dry, thresh_wet, wnd_dry_spell, len_dry_spell, lat_trgt, lon_trgt, fcst_dir):
     lon_bnds, lat_bnds = domain_boundaries(region)
     day_start, nwks, ndts, ntwd = global_parameters()
     nlat = len(lat_trgt)
@@ -206,19 +243,35 @@ def calculate_onset_fcst(region, month_start, year_fcst, system, thresh_dry, thr
         raise Exception(f"No forecast data found for selected year {year_fcst}.")
     print("Loading and interpolating forecast data ...")
     partial_func = partial(_preprocess, lon_bnds=lon_bnds, lat_bnds=lat_bnds)
-    ds = xr.open_mfdataset(filename, preprocess=partial_func)
-    lon_fcst = ds.lon.values
-    lat_fcst = ds.lat.values
-    prcp_fcst_cum = 1e3*np.insert(ds.precip.values, 0, 0.0, axis=1)
-    ds.close()
-    prcp_fcst_1d = np.maximum(0., prcp_fcst_cum[:,day_start:(day_start+ndts),:,:]-prcp_fcst_cum[:,(day_start-1):(day_start+ndts-1),:,:])
-    prcp_fcst_3d = np.maximum(0., prcp_fcst_cum[:,(day_start+2):(day_start+ndts+2),:,:]-prcp_fcst_cum[:,(day_start-1):(day_start+ndts-1),:,:])
+    if system == 'wrf':
+        ds = xr.open_mfdataset(filename, preprocess=partial_func)
+        lon_fcst = ds.lon.values
+        lat_fcst = ds.lat.values
+        nmbs = ds.init_date.size
+        nlts = ds.valid_time.size
+        if nlts < day_start + ndts - 1:
+            prcp_fcst_1d = np.pad(ds.precip.values[:,(day_start-1):,:,:], ((0,0),(0,day_start+ndts-1-nlts),(0,0),(0,0)), mode='constant', constant_values=np.nan)      # pad with NaNs at the end
+        else:
+            prcp_fcst_1d = ds.precip.values[:,(day_start-1):(day_start+ndts-1),:,:]
+        if nlts < day_start + ndts + 1:
+            prcp_fcst_3d = np.pad(ds.rolling(valid_time=3).sum().precip.values[:,(day_start+1):,:,:], ((0,0),(0,day_start+ndts+1-nlts),(0,0),(0,0)), mode='constant', constant_values=np.nan)
+        else:
+            prcp_fcst_3d = ds.rolling(valid_time=3).sum().precip.values[:,(day_start+1):(day_start+ndts+1),:,:]
+        ds.close()
+    else:
+        ds = xr.open_mfdataset(filename, preprocess=partial_func)
+        lon_fcst = ds.lon.values
+        lat_fcst = ds.lat.values
+        prcp_fcst_cum = 1e3*np.insert(ds.precip.values, 0, 0.0, axis=1)
+        ds.close()
+        prcp_fcst_1d = np.maximum(0., prcp_fcst_cum[:,day_start:(day_start+ndts),:,:]-prcp_fcst_cum[:,(day_start-1):(day_start+ndts-1),:,:])         # assumes that forecasts are available for these lead times
+        prcp_fcst_3d = np.maximum(0., prcp_fcst_cum[:,(day_start+2):(day_start+ndts+2),:,:]-prcp_fcst_cum[:,(day_start-1):(day_start+ndts-1),:,:])
+        nmbs = prcp_fcst_cum.shape[0]
    # Interpolate forecasts and record exceedances of the 1-day/3-day threshold
-    nmbs = prcp_fcst_cum.shape[0]
     prcp_fcst_1d_ip = interpolate_forecasts(prcp_fcst_1d, lat_fcst, lon_fcst, lat_trgt, lon_trgt)
-    exc_1d = np.greater(prcp_fcst_1d_ip, thresh_dry[None,:,:,:])
+    exc_1d = np.where(np.isnan(prcp_fcst_1d_ip), True, np.greater(prcp_fcst_1d_ip, thresh_dry[None,:,:,:]))   # assume a rainy day if data is missing ...
     prcp_fcst_3d_ip = interpolate_forecasts(prcp_fcst_3d, lat_fcst, lon_fcst, lat_trgt, lon_trgt)
-    exc_3d = np.greater(prcp_fcst_3d_ip, thresh_wet[None,:,:,:])
+    exc_3d = np.where(np.isnan(prcp_fcst_3d_ip), False, np.greater(prcp_fcst_3d_ip, thresh_wet[None,:,:,:]))  # ... but don't assume enough rainfall to qualify as a wet spell
     mask = np.logical_or(np.isnan(prcp_fcst_1d_ip), np.isnan(thresh_dry[None,:,:,:]))
    # Calculate rainy season onset forecast based on these exceedances
     print("Calculating rainy season onset dates ...")
@@ -230,8 +283,8 @@ def calculate_onset_fcst(region, month_start, year_fcst, system, thresh_dry, thr
             continue
         for ilat in range(nlat):
             for ilon in range(nlon):
-                if not np.any(mask[imb,:,ilat,ilon]):
-                    onset_day_fcst[imb,ilat,ilon] = find_onset_day(exc_1d[imb,:,ilat,ilon], exc_3d[imb,:,ilat,ilon], len_dry_spell[ilat,ilon])
+                if not np.all(mask[imb,:,ilat,ilon]):
+                    onset_day_fcst[imb,ilat,ilon] = find_onset_day(exc_1d[imb,:,ilat,ilon], exc_3d[imb,:,ilat,ilon], wnd_dry_spell[ilat,ilon], len_dry_spell[ilat,ilon])
     return onset_day_fcst
 
 
