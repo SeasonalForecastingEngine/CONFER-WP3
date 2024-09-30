@@ -8,8 +8,6 @@ from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from matplotlib.patches import Rectangle
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from .glp import global_parameters
-
 
 
 def plot_fields_simple(fields, titles, cmap, unit, lat, lon, season, year):
@@ -212,9 +210,7 @@ def plot_fields (fields_list, lon, lat, lon_bounds, lat_bounds, main_title, subt
 
 
 
-def plot_onset_prediction (onset_day_fcst, onset_day_lower_tercile, onset_day_upper_tercile, lon, lat, lon_bounds, lat_bounds, season, year_fcst, cmap_onset, cmap_terciles):
-    
-    day_start, nwks, ndts, ntwd = global_parameters()
+def plot_onset_prediction (onset_day_fcst, onset_day_lower_tercile, onset_day_upper_tercile, lon, lat, lon_bounds, lat_bounds, main_title, onset_week_labels, cmap_onset, cmap_tcl_probs):
     
     n_img = 3
     img_extent = lon_bounds + lat_bounds
@@ -229,6 +225,8 @@ def plot_onset_prediction (onset_day_fcst, onset_day_lower_tercile, onset_day_up
     dlon = (lon_bounds[1]-lon_bounds[0]) // 8
     dlat = (lat_bounds[1]-lat_bounds[0]) // 8
     
+    nwks = len(onset_week_labels) - 1
+
     prob_failed = np.where(np.all(np.isnan(onset_day_fcst), axis=0), np.nan, np.mean(onset_day_fcst == -1, axis=0))
     onset_day_fcst_failed_na = np.where(onset_day_fcst<0, np.nan, onset_day_fcst)
     onset_week_fcst = 1 + (onset_day_fcst-1)//7
@@ -243,13 +241,11 @@ def plot_onset_prediction (onset_day_fcst, onset_day_lower_tercile, onset_day_up
     prob_fcst_tcl.shape = prob_failed.shape
     median_fcst = np.where(np.sum(onset_day_fcst==-1, axis=0)>3, np.nan, np.nanmedian(np.where(onset_day_fcst==-1, np.nan, onset_week_fcst), axis=0))
     
-    onset_week_labels = [(pd.Timestamp(date_start)+pd.Timedelta(days=7*iwk)).strftime("%d %b") for iwk in range(nwks+1)]
-    
     fields_list = [prob_failed, median_fcst, prob_fcst_tcl]
     vmin = [0.0, 0, -1.0]
     vmax = [1.0, nwks, 1.0]
     subtitle_list = ['Probability of failed onset', 'Median onset date forecast', 'Tercile probability forecast']
-    cmap = ['Reds', newcmp_onset, newcmp_tercile]
+    cmap = ['Reds', cmap_onset, cmap_tcl_probs]
     
     fig_height = 7.
     fig_width = (n_img*1.15)*(fig_height/1.1)*np.diff(lon_bounds)[0]/np.diff(lat_bounds)[0]
@@ -281,7 +277,7 @@ def plot_onset_prediction (onset_day_fcst, onset_day_lower_tercile, onset_day_up
     
     fig.canvas.draw()
     plt.tight_layout(rect=[0,0,1,0.95])
-    fig.suptitle(f'Rainy season onset forecast for {season} {year_fcst}', fontsize=16)
+    fig.suptitle(main_title, fontsize=16)
     plt.show()
 
 
