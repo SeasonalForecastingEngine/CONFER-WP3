@@ -8,10 +8,12 @@ import xarray as xr
 
 from os import path
 
-wrf_dir = sys.argv[1]
-month_init = sys.argv[2]
+fcst_dir = sys.argv[1]
+dom = sys.argv[2]
+month_init = sys.argv[3]
 
-#wrf_dir = '/home/michael/nr/samba/PostClimDataNoBackup/CONFER/Data/Forecasts_daily_nc/'
+#fcst_dir = '/home/michael/nr/samba/PostClimDataNoBackup/CONFER/Data/Forecasts_daily_nc/'
+#dom = 'd02'
 #month_init = 'may'
 
 dates_init = {'may': ['050100', '051100', '051600', '052100']}[month_init]
@@ -28,7 +30,7 @@ for year in years:
     ndts = date_range.size
     prcp = np.full((4,ndts,120,120), np.nan, dtype=float)
     for iidt, date_init in zip(range(4), dates_init):
-        filename = f'{wrf_dir}wrf/{month_init}/{season}_WRF_{date_init}/WRF_{season}_DailyPrec_init_025g_{year}{date_init}_trop_d02.nc'
+        filename = f'{fcst_dir}wrf_{dom}/{month_init}/{season}_WRF_{date_init}/WRF_{season}_DailyPrec_init_025g_{year}{date_init}_trop_{dom}.nc'
         if not path.exists(filename):
             warnings.warn(f"{filename} not found.")
             continue
@@ -39,7 +41,7 @@ for year in years:
             if idt_matched.size > 0:
                 prcp[iidt,idt,:,:] = data_load.prec.values[idt_matched[0],:,:]
         data_load.close()
-        
+    
     da_prcp = xr.DataArray(
         data= prcp,
         dims=['init_date','valid_time','latitude','longitude'],
@@ -49,7 +51,7 @@ for year in years:
             description='forecast daily precipitation amount',
             units='mm/m^2',),
         )
-    da_prcp.to_netcdf(f'{wrf_dir}wrf/{month_init}/wrf_{month_init}_{year}.nc')
+    da_prcp.to_netcdf(f'{fcst_dir}wrf_{dom}/{month_init}/wrf_{dom}_{month_init}_{year}.nc')
 
 
 

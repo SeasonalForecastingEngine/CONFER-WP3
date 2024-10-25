@@ -190,9 +190,9 @@ def calculate_adjusted_thresholds(region, month_start, year_clm_start, year_clm_
     ds.close()
     prcp_fcst_1d = np.full((nyrs,nmbs,nlts-2,nlatf,nlonf), np.nan, dtype=np.float32)
     prcp_fcst_3d = np.full((nyrs,nmbs,nlts-2,nlatf,nlonf), np.nan, dtype=np.float32)
+    print(f"Loading {system.upper()} forecast data ...")
     for iyr in range(len(available_years)):
-        print(f"Loading {system.upper()} forecast data for {available_years[iyr]} ...")
-        if system == 'wrf':
+        if system[:3] == 'wrf':
             ds = xr.open_mfdataset(file_list[iyr], preprocess=partial_func)
             prcp_fcst_1d[iyr,:,:,:] = ds.precip.values[:,:-2,:,:]
             prcp_fcst_3d[iyr,:,:,:] = ds.rolling(valid_time=3).sum().precip.values[:,2:,:,:]
@@ -208,6 +208,7 @@ def calculate_adjusted_thresholds(region, month_start, year_clm_start, year_clm_
     if cv:
         thr_dry_adj = np.full((nyrs,ndts,nlat,nlon), np.nan, dtype=float)
         for iyr in range(nyrs):
+            print(f"Processing year {years_clm[iyr]}")
             prcp_1d_cv = np.delete(prcp_1d, iyr, axis=0)
             prcp_1d_pb_thr_dry = calculate_prob_below_threshold(prcp_1d_cv, thr_dry)
             prcp_fcst_1d_cv = np.delete(prcp_fcst_1d, iyr, axis=0)
@@ -219,6 +220,7 @@ def calculate_adjusted_thresholds(region, month_start, year_clm_start, year_clm_
     if cv:
         thr_wet_adj = np.full((nyrs,ndts,nlat,nlon), np.nan, dtype=float)
         for iyr in range(nyrs):
+            print(f"Processing year {years_clm[iyr]}")
             prcp_3d_cv = np.delete(prcp_3d, iyr, axis=0)
             prcp_3d_pb_thr_wet = calculate_prob_below_threshold(prcp_3d_cv, thr_wet)
             prcp_fcst_3d_cv = np.delete(prcp_fcst_3d, iyr, axis=0)
@@ -241,9 +243,9 @@ def calculate_onset_fcst(region, month_start, year_fcst, system, thresh_dry, thr
     filename = get_filename(fcst_dir, system, year_fcst, month_start)
     if not path.exists(filename):
         raise Exception(f"No forecast data found for selected year {year_fcst}.")
-    print("Loading and interpolating forecast data ...")
+    print(f"Loading and interpolating forecast data for year {year_fcst} ...")
     partial_func = partial(_preprocess, lon_bnds=lon_bnds, lat_bnds=lat_bnds)
-    if system == 'wrf':
+    if system[:3] == 'wrf':
         ds = xr.open_mfdataset(filename, preprocess=partial_func)
         lon_fcst = ds.lon.values
         lat_fcst = ds.lat.values
