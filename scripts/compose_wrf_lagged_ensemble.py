@@ -39,7 +39,7 @@ for year in years:
         for idt in range(ndts):
             idt_matched = np.where(date_range[idt]==time)[0]
             if idt_matched.size > 0:
-                prcp[iidt,idt,:,:] = data_load.prec.values[idt_matched[0],:,:]
+                prcp[iidt,idt,:,:] = np.where(data_load.prec.values[idt_matched[0],:,:]>1e4, np.nan, data_load.prec.values[idt_matched[0],:,:])
         data_load.close()
     
     da_prcp = xr.DataArray(
