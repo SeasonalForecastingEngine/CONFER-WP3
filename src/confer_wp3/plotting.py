@@ -226,7 +226,8 @@ def plot_onset_prediction (onset_day_fcst, onset_day_lower_tercile, onset_day_up
     dlat = (lat_bounds[1]-lat_bounds[0]) // 8
     
     nwks = len(onset_week_labels) - 1
-
+    nmbs = onset_day_fcst.shape[0]
+    
     prob_failed = np.where(np.all(np.isnan(onset_day_fcst), axis=0), np.nan, np.mean(onset_day_fcst == -1, axis=0))
     onset_day_fcst_failed_na = np.where(onset_day_fcst<0, np.nan, onset_day_fcst)
     onset_week_fcst = 1 + (onset_day_fcst-1)//7
@@ -239,7 +240,7 @@ def plot_onset_prediction (onset_day_fcst, onset_day_lower_tercile, onset_day_up
     prob_fcst_tcl[ind_show_bn] = -prob_fcst_bn[ind_show_bn]
     prob_fcst_tcl[ind_show_an] = prob_fcst_an[ind_show_an]
     prob_fcst_tcl.shape = prob_failed.shape
-    median_fcst = np.where(np.sum(onset_day_fcst==-1, axis=0)>3, np.nan, np.nanmedian(np.where(onset_day_fcst==-1, np.nan, onset_week_fcst), axis=0))
+    median_fcst = np.where(np.sum(onset_day_fcst==-1, axis=0)>(nmbs-2), np.nan, np.nanmedian(np.where(onset_day_fcst==-1, np.nan, onset_week_fcst), axis=0))
     
     fields_list = [prob_failed, median_fcst, prob_fcst_tcl]
     vmin = [0.0, 0, -1.0]

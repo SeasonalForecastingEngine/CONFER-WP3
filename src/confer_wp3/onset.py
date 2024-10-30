@@ -290,3 +290,27 @@ def calculate_onset_fcst(region, month_start, year_fcst, system, thresh_dry, thr
     return onset_day_fcst
 
 
+
+# Function for augmenting the ensemble forecasts by considering forecasts at neighboring grid points
+
+def augment_onset_fcst(onset_day_fcst, axis=0):
+    if axis == 0:
+        nmbs, nlat, nlon = onset_day_fcst.shape
+        onset_day_fcst_padded = np.pad(onset_day_fcst, ((0,0),(1,1),(1,1)), mode='edge')
+        onset_day_fcst_augm = np.full((9*nmbs,nlat,nlon), np.nan, dtype=float)
+        for i in range(9):
+            ixs, iys = (i%3), (i//3)
+            onset_day_fcst_augm[i*nmbs:(i+1)*nmbs,:,:] = onset_day_fcst_padded[:,iys:(nlat+iys),ixs:(nlon+ixs)]
+    elif axis == 1:
+        nyrs, nmbs, nlat, nlon = onset_day_fcst.shape
+        onset_day_fcst_padded = np.pad(onset_day_fcst, ((0,0),(0,0),(1,1),(1,1)), mode='edge')
+        onset_day_fcst_augm = np.full((nyrs,9*nmbs,nlat,nlon), np.nan, dtype=float)
+        for i in range(9):
+            ixs, iys = (i%3), (i//3)
+            onset_day_fcst_augm[:,i*nmbs:(i+1)*nmbs,:,:] = onset_day_fcst_padded[:,:,iys:(nlat+iys),ixs:(nlon+ixs)]
+    else:
+        raise Exception("Method only implemented for 'axis=0' and 'axis=1'.")
+    return onset_day_fcst_augm
+
+
+
