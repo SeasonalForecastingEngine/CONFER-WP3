@@ -104,8 +104,11 @@ def load_and_interpolate_forecast(system, year_fcst, month_init, lon_target, lat
     prcp_fcst = ds.precip.values
     ds.close()
     nmbs, nlts, nlatf, nlonf = prcp_fcst.shape
-    prcp_daily = np.maximum(0., 1000.*np.diff(np.insert(prcp_fcst, 0, 0., axis=1), axis=1))
-    prcp_daily_ip = interpolate_forecasts(prcp_daily, lat_fcst, lon_fcst, lat_target, lon_target)
+    if system[:3] == 'wrf':
+        prcp_daily_ip = interpolate_forecasts(prcp_fcst, lat_fcst, lon_fcst, lat_target, lon_target)
+    else:
+        prcp_daily = np.maximum(0., 1000.*np.diff(np.insert(prcp_fcst, 0, 0., axis=1), axis=1))
+        prcp_daily_ip = interpolate_forecasts(prcp_daily, lat_fcst, lon_fcst, lat_target, lon_target)
     return prcp_daily_ip
 
 

@@ -57,7 +57,7 @@ def calculate_target_percentiles(target, year_train_start, year_train_end, lon_b
 
 # Helper function to calculate daily average forecast precipitation amounts over each pentad
 
-def calculate_pentad_daily_average(prcp_fcst, year_fcst, month_init, return_index=False):
+def calculate_pentad_daily_average(prcp_fcst, year_fcst, month_init, system, return_index=False):
     nmbs, nlts, nlatf, nlonf = prcp_fcst.shape
     nlm = nlts // 30
     npts = 6*nlm
@@ -76,11 +76,23 @@ def calculate_pentad_daily_average(prcp_fcst, year_fcst, month_init, return_inde
         pentad_end_idx[6*imt+5] =  pentad_end_idx[6*imt+4] + monthrange(year_valid, month_valid)[1] - days_this_month
    # Calculate accumulations between these delineations
     prcp_fcst_pentad = np.full((nmbs,npts,nlatf,nlonf), np.nan, dtype=np.float32)
-    prcp_fcst_pentad[:,0,:,:] = 200.*prcp_fcst[:,pentad_end_idx[0],:,:]
-    for ipt in range(1,npts):
-        ilt0 = pentad_end_idx[ipt-1]
-        ilt1 = pentad_end_idx[ipt]
-        prcp_fcst_pentad[:,ipt,:,:] = np.maximum(0.,1000.*(prcp_fcst[:,ilt1,:,:]-prcp_fcst[:,ilt0,:,:])/(ilt1-ilt0))
+    if system[:3] == 'wrf':
+        for ipt in range(npts):
+            if ipt == 0:
+                ilt0 = 0
+            else:
+                ilt0 = pentad_end_idx[ipt-1] + 1
+            ilt1 = pentad_end_idx[ipt] + 1
+            if not np.all(np.isnan(prcp_fcst[:,ilt0:ilt1,:,:])):
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", category=RuntimeWarning)
+                    prcp_fcst_pentad[:,ipt,:,:] = np.nanmean(prcp_fcst[:,ilt0:ilt1,:,:], axis=1)
+    else:
+        prcp_fcst_pentad[:,0,:,:] = 200.*prcp_fcst[:,pentad_end_idx[0],:,:]
+        for ipt in range(1,npts):
+            ilt0 = pentad_end_idx[ipt-1]
+            ilt1 = pentad_end_idx[ipt]
+            prcp_fcst_pentad[:,ipt,:,:] = np.maximum(0.,1000.*(prcp_fcst[:,ilt1,:,:]-prcp_fcst[:,ilt0,:,:])/(ilt1-ilt0))
     if return_index:
         return prcp_fcst_pentad, pentad_end_idx
     else:
@@ -118,13 +130,15 @@ def calculate_forecast_percentiles(system, target, year_train_start, year_train_
         ds = xr.open_mfdataset(file_list[iyr], preprocess=partial_func)
         prcp_fcst = ds.precip.values[:nmbs,:nlts,:,:]
         ds.close()
-        prcp_pentad_daily_avg[iyr,:,:,:,:] = calculate_pentad_daily_average(prcp_fcst, available_years[iyr], month_init)
+        prcp_pentad_daily_avg[iyr,:,:,:,:] = calculate_pentad_daily_average(prcp_fcst, available_years[iyr], month_init, system=system)
     prcp_fcst_pct = np.full((npts,99,nlat,nlon), np.nan, dtype=np.float32)
     for ipt in range(npts):
         if ipt % 10 == 0:
             print(f"Processing pentad {ipt+1}/{npts} ...")
         prcp_pentad_daily_avg_ip = interpolate_forecasts(prcp_pentad_daily_avg[:,:,ipt,:,:], lat_fcst, lon_fcst, lat_target, lon_target)
-        prcp_fcst_pct[ipt,:,:,:] = np.percentile(prcp_pentad_daily_avg_ip, axis=(0,1), q=range(1,100,1))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            prcp_fcst_pct[ipt,:,:,:] = np.nanpercentile(prcp_pentad_daily_avg_ip, axis=(0,1), q=range(1,100,1))
     print(f"Output saved as '{filename_pct_fcst}'.")
     da_prcp_pct = xr.DataArray(
         data= prcp_fcst_pct,
@@ -193,9 +207,12 @@ def downscale_forecasts(system, year_fcst, month_init, pctl_fcst, pctl_target, l
     prcp_fcst = ds.precip.values
     ds.close()
     nmbs, nlts, nlatf, nlonf = prcp_fcst.shape
-    prcp_daily = np.maximum(0., 1000.*np.diff(np.insert(prcp_fcst, 0, 0., axis=1), axis=1))
-    prcp_daily_ip = interpolate_forecasts(prcp_daily, lat_fcst, lon_fcst, lat_target, lon_target)
-    prcp_pentad_daily_avg, pentad_end_idx = calculate_pentad_daily_average(prcp_fcst, year_fcst, month_init, return_index=True)
+    if system[:3] == 'wrf':
+        prcp_daily_ip = interpolate_forecasts(prcp_fcst, lat_fcst, lon_fcst, lat_target, lon_target)
+    else:
+        prcp_daily = np.maximum(0., 1000.*np.diff(np.insert(prcp_fcst, 0, 0., axis=1), axis=1))
+        prcp_daily_ip = interpolate_forecasts(prcp_daily, lat_fcst, lon_fcst, lat_target, lon_target)
+    prcp_pentad_daily_avg, pentad_end_idx = calculate_pentad_daily_average(prcp_fcst, year_fcst, month_init, system=system, return_index=True)
     prcp_pentad_daily_avg_ip = interpolate_forecasts(prcp_pentad_daily_avg, lat_fcst, lon_fcst, lat_target, lon_target)
     prcp_daily_bc = np.full((nmbs,pentad_end_idx[-1]+1,nlat,nlon), np.nan, dtype=np.float32)
     npts = len(pentad_end_idx)

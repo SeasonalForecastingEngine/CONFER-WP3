@@ -26,7 +26,7 @@ packages = [
 # The fields below can be left blank and poetry will update them for you when a package is added or removed
 # using "poetry add <package>"/"poetry remove <package>".
 
-python = ">=3.8,<3.13" # Required Python versions
+python = ">=3.8,<=3.13" # Required Python versions
 Cartopy = ">=0.21.1"
 cfgrib = "^0.9.12.0"
 dask = "^2023.6.0"
